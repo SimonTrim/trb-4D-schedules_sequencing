@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'Open Sans', 'Segoe UI', sans-serif;
+  background: #ffffff;
+  color: #252a2e;
+}
+
+modus-card,
+modus-table,
+modus-tabs,
+modus-slider,
+modus-switch,
+modus-button,
+modus-badge,
+modus-text-input,
+modus-date-input,
+modus-select,
+modus-progress-bar {
+  font-family: inherit;
+}
+
+.viewer-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}

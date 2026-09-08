@@ -1,0 +1,23 @@
+{
+  "name": "4D schedules",
+  "version": "1.0.0",
+  "api": "1.0",
+  "extensions": [
+    {
+      "type": "projectModule",
+      "id": "4d-schedules",
+      "title": "4D schedules",
+      "icon": "./icon.svg",
+      "url": "./index.html",
+      "description": "Every model's construction schedule: full-width Gantt, import/export, progress and baselines."
+    },
+    {
+      "type": "viewerModule",
+      "id": "4d-sequencing",
+      "title": "4D sequencing",
+      "icon": "./icon.svg",
+      "url": "./index.html?mode=viewer"
+    }
+  ],
+  "permissions": ["project.read", "files.read"]
+}

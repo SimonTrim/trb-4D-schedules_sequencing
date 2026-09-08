@@ -1,0 +1,275 @@
+# Directives Globales Agent IA Cursor - Trimble Connect 4D Schedules Extension
+
+## 1. Contexte & Objectif du Projet
+Vous devez développer une extension web SaaS pour Trimble Connect for Browser nommée "4D Schedules & Progress Tracker".
+L'application permet aux conducteurs de travaux, BIM managers et ingénieurs de suivre l'avancement de chantier en 4D, synchroniser la maquette 3D IFC avec un planning Gantt, visualiser un Heatmap par statut de pose et analyser la courbe S-Curve d'avancement.
+
+L'interface doit respecter rigoureusement le Design System officiel de Trimble via Trimble Modus Web Components v1.16.0.
+
+---
+
+## 2. Tech Stack Mandatée
+- Framework Frontend : React 18 (TypeScript) + Vite
+- Styles & Layout : Tailwind CSS + Trimble Modus Web Components 1.16.0
+- Design System : @trimble-oss/modus-web-components@1.16.0
+- Trimble Connect SDK : @trimble-oss/connect-workspace-api
+- Graphiques & Analytics : Recharts / Chart.js
+- Icônes : Lucide React
+
+---
+
+## 3. Product Requirement Document (PRD)
+
+### Vues & Ergonomie (Inspirées des interfaces Trimble Connect)
+1. Vue Macro - Dashboard "4D Schedules" (Pleine largeur) :
+   - En-tête avec titre Modus et sous-titre explicatif.
+   - Tableau principal <modus-table> affichant les modèles IFC, le nombre d'activités, les plages de dates, la date de statut et des badges d'état (Shared, Late, Actual).
+   - Barre d'onglets <modus-tabs> : Gantt, Progress, Import / Export, Baselines.
+
+2. Vue Divisée (3D Canvas + Gantt + Panneau Latéral "4D Sequencing") :
+   - Zone Supérieure : Viewer 3D Trimble Connect affichant la maquette colorisée dynamiquement.
+   - Panneau Latéral Flottant ("4D sequencing") :
+     - Contrôle du Playhead temporel via un curseur <modus-slider>.
+     - Interrupteurs <modus-switch> : Display Gantt chart, Status colors, Hide unbuilt work, Dependency links, Actual progress, Late elements.
+   - Zone Inférieure : Diagramme de Gantt synchronisé. Le déplacement du Playhead modifie la visibilité et la couleur des objets 3D en temps réel.
+
+3. Palette des Statuts & Couleurs 4D :
+   - NOT_STARTED (#9CA3AF / Alpha 0.3) - Non Commencé
+   - PROCUREMENT (#3B82F6 / Alpha 0.8) - Commandé / Approvisionné
+   - DELIVERED (#EAB308 / Alpha 0.8) - Livré Sur Chantier
+   - INSTALLED (#F97316 / Alpha 0.9) - Posé / Exécuté
+   - APPROVED (#22C55E / Alpha 0.9) - Validé / Réceptionné
+   - BLOCKED (#EF4444 / Alpha 1.0) - Bloqué / Réclamation
+
+---
+
+## 4. Configurations & Code Source Référence du Projet
+
+### A. package.json
+{
+  "name": "trimble-4d-schedules-extension",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@trimble-oss/connect-workspace-api": "^1.1.0",
+    "@trimble-oss/modus-web-components": "1.16.0",
+    "lucide-react": "^0.300.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^2.10.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0"
+  }
+}
+
+### B. Déclaration TypeScript Modus (src/types/modus.d.ts)
+declare namespace JSX {
+  interface IntrinsicElements {
+    'modus-button': any;
+    'modus-tabs': any;
+    'modus-tab': any;
+    'modus-switch': any;
+    'modus-slider': any;
+    'modus-badge': any;
+    'modus-card': any;
+    'modus-date-input': any;
+    'modus-table': any;
+    'modus-text-input': any;
+    'modus-select': any;
+    'modus-toast': any;
+    'modus-progress-bar': any;
+    'modus-modal': any;
+    'modus-tooltip': any;
+  }
+}
+
+### C. Modèle de Données & Contrats TypeScript (src/types/schedule.ts)
+export type ProgressStatus = 
+  | 'NOT_STARTED' 
+  | 'PROCUREMENT' 
+  | 'DELIVERED' 
+  | 'INSTALLED' 
+  | 'APPROVED' 
+  | 'BLOCKED';
+
+export interface ColorRGBA {
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+}
+
+export interface StatusConfig {
+  code: ProgressStatus;
+  labelFr: string;
+  colorHex: string;
+  rgba: ColorRGBA;
+}
+
+export const STATUS_CONFIGS: Record<ProgressStatus, StatusConfig> = {
+  NOT_STARTED: { code: 'NOT_STARTED', labelFr: 'Non Commencé', colorHex: '#9CA3AF', rgba: { r: 156, g: 163, b: 175, a: 0.3 } },
+  PROCUREMENT: { code: 'PROCUREMENT', labelFr: 'Commandé / Appro', colorHex: '#3B82F6', rgba: { r: 59, g: 130, b: 246, a: 0.8 } },
+  DELIVERED: { code: 'DELIVERED', labelFr: 'Livré sur Chantier', colorHex: '#EAB308', rgba: { r: 234, g: 179, b: 8, a: 0.8 } },
+  INSTALLED: { code: 'INSTALLED', labelFr: 'Posé / Exécuté', colorHex: '#F97316', rgba: { r: 249, g: 115, b: 22, a: 0.9 } },
+  APPROVED: { code: 'APPROVED', labelFr: 'Validé / Réceptionné', colorHex: '#22C55E', rgba: { r: 34, g: 197, b: 94, a: 0.9 } },
+  BLOCKED: { code: 'BLOCKED', labelFr: 'Bloqué / Problème', colorHex: '#EF4444', rgba: { r: 239, g: 68, b: 68, a: 1.0 } }
+};
+
+export interface ProgressRecord {
+  objectId: string;
+  modelId: string;
+  objectName?: string;
+  status: ProgressStatus;
+  updatedAt: string;
+  updatedBy: string;
+  notes?: string;
+}
+
+export interface ActivityTask {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  actualStart?: string;
+  actualEnd?: string;
+  progressPercent: number;
+  assignedObjectIds: string[];
+}
+
+export interface IFCModelSchedule {
+  modelId: string;
+  modelName: string;
+  activitiesCount: number;
+  startDate: string;
+  endDate: string;
+  statusDate: string;
+  objectsCount: number;
+  linksCount: number;
+  storageState: 'Shared' | 'Local';
+  lateCount?: number;
+}
+
+### D. Initialisation du Design System Modus (src/main.tsx)
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './index.css';
+
+import '@trimble-oss/modus-web-components/dist/modus-web-components/modus-web-components.css';
+import { defineCustomElements } from '@trimble-oss/modus-web-components/loader';
+
+defineCustomElements(window);
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App/>
+  </React.StrictMode>
+);
+
+### E. Connecteur API Trimble Connect Workspace (src/services/trimbleApi.ts)
+import { createWorkspaceApi, WorkspaceApi } from "@trimble-oss/connect-workspace-api";
+import { ColorRGBA } from "../types/schedule";
+
+export async function initTrimbleApi(): Promise<WorkspaceApi | null> {
+  try {
+    const api = await createWorkspaceApi();
+    console.log("Connecté avec succès à Trimble Connect Workspace API");
+    return api;
+  } catch (error) {
+    console.warn("API Workspace non disponible (Exécution locale / Mode Demo Mock)");
+    return null;
+  }
+}
+
+export async function setObjectsColor(
+  workspaceApi: WorkspaceApi | null, 
+  ids: string[], 
+  color: ColorRGBA
+) {
+  if (!workspaceApi || ids.length === 0) return;
+  try {
+    await workspaceApi.viewer.setObjectColor({ ids, color });
+  } catch (err) {
+    console.error("Erreur lors de la mise à jour des couleurs :", err);
+  }
+}
+
+export async function resetObjectsColor(workspaceApi: WorkspaceApi | null) {
+  if (!workspaceApi) return;
+  try {
+    await workspaceApi.viewer.resetObjectColors();
+  } catch (err) {
+    console.error("Erreur lors de la réinitialisation des couleurs :", err);
+  }
+}
+
+export async function hideObjects(workspaceApi: WorkspaceApi | null, ids: string[]) {
+  if (!workspaceApi || ids.length === 0) return;
+  try {
+    await workspaceApi.viewer.setObjectVisibility({ ids, visible: false });
+  } catch (err) {
+    console.error("Erreur lors du masquage des objets :", err);
+  }
+}
+
+export async function showAllObjects(workspaceApi: WorkspaceApi | null) {
+  if (!workspaceApi) return;
+  try {
+    await workspaceApi.viewer.resetObjectVisibility();
+  } catch (err) {
+    console.error("Erreur lors du réaffichage des objets :", err);
+  }
+}
+
+export function subscribeToSelection(
+  workspaceApi: WorkspaceApi | null, 
+  callback: (selectedObjects: any[]) => void
+) {
+  if (!workspaceApi) return;
+  workspaceApi.viewer.onSelectionChanged(async (selection) => {
+    callback(selection);
+  });
+}
+
+---
+
+## 5. Arborescence Cible à Générer
+/src
+  ├── /components
+  │     ├── Header.tsx              // En-tête officiel style Trimble Connect
+  │     ├── ScheduleTable.tsx      // Tableau principal des modèles IFC (Modus Table)
+  │     ├── GanttChart.tsx         // Canvas/SVG du Gantt interactif synchronisé
+  │     ├── SequencingPanel.tsx   // Panneau 4D latéral (Switches & Slider Modus)
+  │     ├── ProgressAnalytics.tsx  // Courbe S-Curve Recharts + KPI Cards Modus
+  │     └── ActivityDrawer.tsx     // Panneau latéral d'édition des tâches
+  ├── /services
+  │     ├── trimbleApi.ts           // Wrapper SDK Trimble Workspace API
+  │     └── mockData.ts             // Données factices pour test immédiat (Modèles & Tâches)
+  ├── /types
+  │     ├── modus.d.ts             // Déclarations JSX Modus 1.16.0
+  │     └── schedule.ts            // Contrats et Interfaces TypeScript
+  ├── App.tsx                       // Container React principal avec state 4D
+  ├── index.css
+  └── main.tsx
+
+---
+
+## 6. Consignes d'Exécution pour Cursor AI
+1. Créez les fichiers de configuration de base (package.json, tsconfig.json, tailwind.config.js, vite.config.ts).
+2. Créez tous les fichiers listés dans le dossier /src.
+3. Remplissez src/services/mockData.ts avec un jeu de données 4D cohérent (Activités, Modèles, Dates, Objets IFC).
+4. Assurez-vous que l'application s'exécute sans erreur lors du lancement de npm run dev.
