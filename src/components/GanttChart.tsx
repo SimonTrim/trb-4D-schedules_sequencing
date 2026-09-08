@@ -52,7 +52,7 @@ export default function GanttChart({
     const cursor = new Date(range.start.getFullYear(), range.start.getMonth(), 1);
     while (cursor.getTime() <= range.end.getTime()) {
       ticks.push({
-        label: cursor.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
+        label: cursor.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }),
         x: LABEL_W + (dateToPercent(cursor, range.start, range.end) / 100) * chartW,
       });
       cursor.setMonth(cursor.getMonth() + 1);
@@ -77,42 +77,42 @@ export default function GanttChart({
           </span>
           {!compact && (
             <span>
-              Click a bar to select its objects, double-click to zoom to them, drag to move or resize.
+              Cliquez sur une barre pour sélectionner ses objets. Les onglets du haut permettent de changer de vue.
             </span>
           )}
           <span className="inline-flex items-center gap-3">
             <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-6 rounded-sm bg-[#22c55e]" /> Planned
+              <span className="h-2 w-6 rounded-sm bg-[#22c55e]" /> Planifié
             </span>
             {options.actualProgress && (
               <span className="inline-flex items-center gap-1">
-                <span className="h-px w-6 bg-black" /> Actual
+                <span className="h-px w-6 bg-black" /> Réel
               </span>
             )}
             <span className="inline-flex items-center gap-1">
-              <span className="h-3 w-px border-l border-dashed border-[#ef4444]" /> Status date
+              <span className="h-3 w-px border-l border-dashed border-[#ef4444]" /> Date de statut
             </span>
           </span>
         </div>
         <div className="flex items-center gap-1 text-[#6a6e79]">
-          <button type="button" className="rounded p-1 hover:bg-[#f1f1f6]" aria-label="Search">
+          <button type="button" className="rounded p-1 hover:bg-[#f1f1f6]" aria-label="Rechercher">
             <Search size={14} />
           </button>
           <button
             type="button"
             className="rounded p-1 hover:bg-[#f1f1f6]"
-            aria-label="Zoom out"
+            aria-label="Dézoomer"
             onClick={() => setZoom((z) => Math.max(0.7, z - 0.15))}
           >
             <Minus size={14} />
           </button>
-          <button type="button" className="rounded p-1 hover:bg-[#f1f1f6]" aria-label="Fit">
+          <button type="button" className="rounded p-1 hover:bg-[#f1f1f6]" aria-label="Ajuster">
             <Maximize2 size={14} />
           </button>
           <button
             type="button"
             className="rounded p-1 hover:bg-[#f1f1f6]"
-            aria-label="Zoom in"
+            aria-label="Zoomer"
             onClick={() => setZoom((z) => Math.min(2.2, z + 0.15))}
           >
             <Plus size={14} />
@@ -191,7 +191,7 @@ export default function GanttChart({
                 </text>
                 {late && (
                   <text x={LABEL_W - 78} y={y + 20} fontSize="10" fill="#c2410c" fontWeight="600">
-                    {activity.assignedObjectIds.length} late
+                    {activity.assignedObjectIds.length} en retard
                   </text>
                 )}
                 <text x={LABEL_W - 18} y={y + 20} fontSize="11" fill="#6a6e79" textAnchor="end">
@@ -222,10 +222,16 @@ export default function GanttChart({
                   LABEL_W +
                   (dateToPercent(parseIso(activity.startDate), range.start, range.end) / 100) * chartW;
                 const y2 = HEAD_H + toIndex * ROW_H + 16;
+                const stub = 12;
+                const midX = x2 >= x1 + stub * 2 ? x1 + Math.max(stub, (x2 - x1) / 2) : x1 + stub;
+                const path =
+                  Math.abs(y2 - y1) < 1
+                    ? `M ${x1} ${y1} L ${x2} ${y2}`
+                    : `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
                 return (
                   <path
                     key={`${predId}-${activity.id}`}
-                    d={`M ${x1} ${y1} C ${x1 + 16} ${y1}, ${x2 - 16} ${y2}, ${x2} ${y2}`}
+                    d={path}
                     fill="none"
                     stroke="#9ca3af"
                     strokeWidth="1.1"

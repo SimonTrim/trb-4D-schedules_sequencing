@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, Box } from 'lucide-react';
-import { IFCModelSchedule } from '../types/schedule';
+import { IFCModelSchedule, STORAGE_STATE_LABELS } from '../types/schedule';
 import { formatIso, UNSCHEDULED_MODEL_COUNT } from '../services/mockData';
 
 interface ScheduleTableProps {
@@ -30,9 +30,9 @@ export default function ScheduleTable({
         onClick={onToggle}
       >
         {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-        <span className="font-semibold">Models</span>
+        <span className="font-semibold">Modèles</span>
         <span className="text-[#6a6e79]">
-          {total} models · {scheduled} with a schedule
+          {total} modèles · {scheduled} avec un planning
         </span>
       </button>
 
@@ -41,13 +41,13 @@ export default function ScheduleTable({
           <table className="w-full min-w-[980px] border-collapse text-left text-[13px]">
             <thead>
               <tr className="text-[11px] uppercase tracking-wide text-[#6a6e79]">
-                <th className="px-3 py-2 font-semibold">Model</th>
-                <th className="px-3 py-2 font-semibold">Activities</th>
-                <th className="px-3 py-2 font-semibold">Date range</th>
-                <th className="px-3 py-2 font-semibold">Status date</th>
-                <th className="px-3 py-2 font-semibold">Objects</th>
-                <th className="px-3 py-2 font-semibold">Links</th>
-                <th className="px-3 py-2 font-semibold">Storage</th>
+                <th className="px-3 py-2 font-semibold">Modèle</th>
+                <th className="px-3 py-2 font-semibold">Activités</th>
+                <th className="px-3 py-2 font-semibold">Période</th>
+                <th className="px-3 py-2 font-semibold">Date de statut</th>
+                <th className="px-3 py-2 font-semibold">Objets</th>
+                <th className="px-3 py-2 font-semibold">Liens</th>
+                <th className="px-3 py-2 font-semibold">Stockage</th>
                 <th className="px-3 py-2 font-semibold" />
               </tr>
             </thead>
@@ -78,15 +78,15 @@ export default function ScheduleTable({
                     <td className="px-3 py-2.5">
                       <span className="inline-flex flex-wrap gap-1">
                         <modus-badge color={model.storageState === 'Shared' ? 'primary' : 'secondary'} size="small">
-                          {model.storageState}
+                          {STORAGE_STATE_LABELS[model.storageState]}
                         </modus-badge>
                         {model.lateCount ? (
                           <modus-badge color="warning" size="small">
-                            {model.lateCount} late
+                            {model.lateCount} en retard
                           </modus-badge>
                         ) : null}
                         <modus-badge color="success" size="small">
-                          Actual
+                          Réel
                         </modus-badge>
                       </span>
                     </td>
@@ -99,7 +99,7 @@ export default function ScheduleTable({
                           onOpenIn3d(model.modelId);
                         }}
                       >
-                        Open in 3D
+                        Ouvrir en 3D
                       </button>
                     </td>
                   </tr>

@@ -14,7 +14,7 @@ export default function Header({ connected, projectName }: HeaderProps) {
         </div>
         <div className="leading-tight">
           <div className="text-[13px] font-semibold tracking-wide">Trimble Connect</div>
-          <div className="text-[11px] text-white/70">4D Schedules &amp; Progress Tracker</div>
+          <div className="text-[11px] text-white/70">Planning 4D &amp; suivi d’avancement</div>
         </div>
       </div>
 

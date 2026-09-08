@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { ActivityTask, ProgressRecord } from '../types/schedule';
+import { ACTIVITY_STATE_LABELS, ActivityState, ActivityTask, ProgressRecord } from '../types/schedule';
 import {
   buildActivityCountCurve,
   computeProgressSnapshot,
@@ -45,14 +45,14 @@ export default function ProgressAnalytics({
   }));
 
   const kpis = [
-    { label: 'Activities', value: snap.activities, tone: 'text-[#252a2e]' },
-    { label: 'Finished', value: snap.finished, tone: 'text-[#252a2e]' },
-    { label: 'In progress', value: snap.inProgress, tone: 'text-[#217cbb]' },
-    { label: 'Behind plan', value: snap.behind, tone: 'text-[#dc2626] font-bold' },
-    { label: 'Ahead of plan', value: snap.ahead, tone: 'text-[#60a5fa]' },
-    { label: 'Not due yet', value: snap.notDue, tone: 'text-[#252a2e]' },
-    { label: 'Late elements', value: snap.lateElements, tone: 'text-[#c2410c] bg-[#fff7ed]' },
-    { label: 'Finished of due', value: snap.finishedOfDue, tone: 'text-[#252a2e]' },
+    { label: 'Activités', value: snap.activities, tone: 'text-[#252a2e]' },
+    { label: 'Terminées', value: snap.finished, tone: 'text-[#252a2e]' },
+    { label: 'En cours', value: snap.inProgress, tone: 'text-[#217cbb]' },
+    { label: 'En retard', value: snap.behind, tone: 'text-[#dc2626] font-bold' },
+    { label: 'En avance', value: snap.ahead, tone: 'text-[#60a5fa]' },
+    { label: 'Non échues', value: snap.notDue, tone: 'text-[#252a2e]' },
+    { label: 'Éléments en retard', value: snap.lateElements, tone: 'text-[#c2410c] bg-[#fff7ed]' },
+    { label: 'Terminées / échues', value: snap.finishedOfDue, tone: 'text-[#252a2e]' },
   ];
 
   return (
@@ -80,8 +80,8 @@ export default function ProgressAnalytics({
                 stroke="#ef4444"
                 strokeDasharray="4 3"
               />
-              <Line type="monotone" dataKey="planned" name="Planned" stroke="#9ca3af" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="actual" name="Actual" stroke="#217cbb" strokeWidth={2} dot={false} connectNulls={false} />
+              <Line type="monotone" dataKey="planned" name="Planifié" stroke="#9ca3af" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="actual" name="Réel" stroke="#217cbb" strokeWidth={2} dot={false} connectNulls={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -91,12 +91,12 @@ export default function ProgressAnalytics({
         <table className="w-full min-w-[820px] text-left text-[13px]">
           <thead className="bg-[#fafafc] text-[11px] uppercase tracking-wide text-[#6a6e79]">
             <tr>
-              <th className="px-3 py-2 font-semibold">Activity</th>
-              <th className="px-3 py-2 font-semibold">State</th>
-              <th className="px-3 py-2 font-semibold">Planned</th>
-              <th className="px-3 py-2 font-semibold">Actual</th>
-              <th className="px-3 py-2 font-semibold">Variance</th>
-              <th className="px-3 py-2 font-semibold">Late</th>
+              <th className="px-3 py-2 font-semibold">Activité</th>
+              <th className="px-3 py-2 font-semibold">État</th>
+              <th className="px-3 py-2 font-semibold">Planifié</th>
+              <th className="px-3 py-2 font-semibold">Réel</th>
+              <th className="px-3 py-2 font-semibold">Écart</th>
+              <th className="px-3 py-2 font-semibold">Retard</th>
             </tr>
           </thead>
           <tbody>
@@ -109,7 +109,7 @@ export default function ProgressAnalytics({
                 <tr key={activity.id} className="border-t border-[#eee]">
                   <td className="px-3 py-2">{activity.name}</td>
                   <td className="px-3 py-2 font-medium" style={{ color: STATE_COLOR[state] }}>
-                    {state}
+                    {ACTIVITY_STATE_LABELS[state as ActivityState]}
                   </td>
                   <td className="px-3 py-2 text-[#6a6e79]">
                     {activity.startDate} → {activity.endDate}

@@ -13,7 +13,7 @@ import {
   listLoadedObjectRefs,
   openIn3dViewer,
   parseExtensionCommand,
-  PROJECT_MENU_COMMANDS,
+  PROJECT_MENU_COMMAND,
   registerProjectMenu,
   resetObjectsColor,
   selectActivityObjects,
@@ -47,9 +47,9 @@ import {
 
 const TABS = [
   { id: 'gantt', label: 'Gantt' },
-  { id: 'progress', label: 'Progress' },
+  { id: 'progress', label: 'Avancement' },
   { id: 'import', label: 'Import / export' },
-  { id: 'baselines', label: 'Baselines' },
+  { id: 'baselines', label: 'Références' },
 ];
 
 const DEFAULT_OPTIONS: SequencingOptions = {
@@ -191,13 +191,7 @@ export default function App() {
       }
       if (event === 'extension.command') {
         const command = parseExtensionCommand(data);
-        const tab = (Object.entries(PROJECT_MENU_COMMANDS) as [DashboardTab, string][]).find(
-          ([, value]) => value === command,
-        )?.[0];
-        if (tab) {
-          applyMode('project');
-          setActiveTab(tab);
-        }
+        if (command === PROJECT_MENU_COMMAND) applyMode('project');
       }
     }).then(async (workspace) => {
       if (cancelled) return;
@@ -213,7 +207,7 @@ export default function App() {
       }
       if (workspace && (isViewerHost(host) || inIframe)) {
         const count = await bindLoadedObjects(workspace);
-        if (count > 0) showToast(`${count} objects linked from the 3D model`);
+        if (count > 0) showToast(`${count} objets liés au modèle 3D`);
       }
     });
 
@@ -226,7 +220,7 @@ export default function App() {
   useEffect(() => {
     if (!api || modelEpoch === 0) return;
     bindLoadedObjects(api).then((count) => {
-      if (count > 0) showToast(`${count} objects linked from the 3D model`);
+        if (count > 0) showToast(`${count} objets liés au modèle 3D`);
     });
   }, [api, modelEpoch, bindLoadedObjects, showToast]);
 
@@ -312,7 +306,7 @@ export default function App() {
     link.download = '4d-schedules-export.json';
     link.click();
     URL.revokeObjectURL(url);
-    showToast('JSON export generated');
+    showToast('Export JSON généré');
   };
 
   const exportCsv = () => {
@@ -327,23 +321,23 @@ export default function App() {
     link.download = '4d-activities.csv';
     link.click();
     URL.revokeObjectURL(url);
-    showToast('CSV export generated');
+    showToast('Export CSV généré');
   };
 
   const importJson = async (file: File) => {
     try {
       const parsed = JSON.parse(await file.text());
       if (Array.isArray(parsed.activities)) setActivities(parsed.activities);
-      showToast('Schedule imported');
+      showToast('Planning importé');
     } catch {
-      showToast('Invalid JSON file');
+      showToast('Fichier JSON invalide');
     }
   };
 
   const openIn3d = async (modelId?: string) => {
     const navigated = await openIn3dViewer(api, modelId);
     if (!navigated) applyMode('viewer');
-    showToast('Opening 3D at playhead date');
+    showToast('Ouverture du viewer 3D à la date du curseur');
   };
 
   const copyLink = async () => {
@@ -351,7 +345,7 @@ export default function App() {
     url.searchParams.set('playhead', formatIso(playheadDate));
     url.searchParams.set('status', statusDate);
     await navigator.clipboard.writeText(url.toString());
-    showToast('Link copied');
+    showToast('Lien copié');
   };
 
   const openActivity = (activity: ActivityTask) => {
@@ -431,7 +425,7 @@ export default function App() {
             onCreateActivity={() => {
               const created: ActivityTask = {
                 id: `act-${Date.now()}`,
-                name: 'New activity',
+                name: 'Nouvelle activité',
                 startDate: formatIso(playheadDate),
                 endDate: formatIso(playheadDate),
                 progressPercent: 0,
@@ -449,7 +443,7 @@ export default function App() {
             onSaveActivity={(next) => {
               setActivities((prev) => prev.map((a) => (a.id === next.id ? next : a)));
               setDrawerActivity(next);
-              showToast('Activity saved');
+              showToast('Activité enregistrée');
             }}
             onAssignSelection={async (activityId) => {
               const fallback = api
@@ -458,7 +452,7 @@ export default function App() {
               setActivities((prev) =>
                 prev.map((a) => (a.id === activityId ? { ...a, assignedObjectIds: fallback } : a)),
               );
-              showToast(fallback.length ? `${fallback.length} objects assigned` : 'No selection in the viewer');
+              showToast(fallback.length ? `${fallback.length} objets assignés` : 'Aucune sélection dans le viewer');
             }}
           />
         )}

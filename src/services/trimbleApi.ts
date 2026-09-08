@@ -142,12 +142,7 @@ export function isViewerHost(host: string | null): boolean {
 
 const MENU_ICON = 'https://trb-4d-schedules-sequencing.vercel.app/icon-48.png';
 
-export const PROJECT_MENU_COMMANDS = {
-  gantt: '4d.gantt',
-  progress: '4d.progress',
-  import: '4d.import',
-  baselines: '4d.baselines',
-} as const;
+export const PROJECT_MENU_COMMAND = '4d.open';
 
 export function parseExtensionCommand(data: unknown): string {
   if (typeof data === 'string') return data.split('?')[0];
@@ -161,15 +156,9 @@ export async function registerProjectMenu(workspaceApi: WorkspaceApi | null) {
   if (!workspaceApi?.ui?.setMenu) return;
   try {
     await workspaceApi.ui.setMenu({
-      title: '4D schedules',
+      title: 'Planning 4D',
       icon: MENU_ICON,
-      command: PROJECT_MENU_COMMANDS.gantt,
-      subMenus: [
-        { title: 'Gantt', command: PROJECT_MENU_COMMANDS.gantt },
-        { title: 'Progress', command: PROJECT_MENU_COMMANDS.progress },
-        { title: 'Import / export', command: PROJECT_MENU_COMMANDS.import },
-        { title: 'Baselines', command: PROJECT_MENU_COMMANDS.baselines },
-      ],
+      command: PROJECT_MENU_COMMAND,
     });
   } catch (err) {
     console.warn('setMenu a échoué :', err);

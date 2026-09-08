@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
-import { ActivityTask } from '../types/schedule';
+import { ACTIVITY_TYPE_LABELS, ActivityTask } from '../types/schedule';
 
 interface ActivityDrawerProps {
   activities: ActivityTask[];
@@ -82,19 +82,19 @@ export default function ActivityDrawer({
     <aside className="flex h-full w-[320px] shrink-0 flex-col border-l border-[#d0d1db] bg-white">
       <div className="flex items-center justify-between border-b border-[#e6e7ee] px-3 py-2">
         <div className="text-[14px] font-semibold">
-          Activities <span className="font-normal text-[#6a6e79]">{activities.length}</span>
+          Activités <span className="font-normal text-[#6a6e79]">{activities.length}</span>
         </div>
         <div className="flex items-center gap-1 text-[#6a6e79]">
-          <button type="button" className="rounded p-1 hover:bg-[#f1f1f6]" onClick={onClose} aria-label="Back">
+          <button type="button" className="rounded p-1 hover:bg-[#f1f1f6]" onClick={onClose} aria-label="Retour">
             <ArrowLeft size={16} />
           </button>
-          <button type="button" className="rounded p-1 hover:bg-[#f1f1f6]" onClick={onCreate} aria-label="Add">
+          <button type="button" className="rounded p-1 hover:bg-[#f1f1f6]" onClick={onCreate} aria-label="Ajouter">
             <Plus size={16} />
           </button>
-          <button type="button" className="rounded p-1 hover:bg-[#f1f1f6]" aria-label="Upload">
+          <button type="button" className="rounded p-1 hover:bg-[#f1f1f6]" aria-label="Importer">
             <Upload size={16} />
           </button>
-          <button type="button" className="rounded p-1 hover:bg-[#f1f1f6]" onClick={onClose} aria-label="Close">
+          <button type="button" className="rounded p-1 hover:bg-[#f1f1f6]" onClick={onClose} aria-label="Fermer">
             <X size={16} />
           </button>
         </div>
@@ -102,10 +102,10 @@ export default function ActivityDrawer({
 
       {draft && (
         <div className="flex flex-col gap-2 border-b border-[#e6e7ee] p-3">
-          <modus-text-input ref={nameRef} label="Activity name" value={draft.name} />
+          <modus-text-input ref={nameRef} label="Nom de l'activité" value={draft.name} />
           <div className="grid grid-cols-2 gap-2">
-            <modus-date-input ref={startRef} label="Start date" value={draft.startDate} />
-            <modus-date-input ref={endRef} label="End date" value={draft.endDate} />
+            <modus-date-input ref={startRef} label="Date de début" value={draft.startDate} />
+            <modus-date-input ref={endRef} label="Date de fin" value={draft.endDate} />
           </div>
           <label className="text-[12px] text-[#6a6e79]">
             Type
@@ -116,13 +116,13 @@ export default function ActivityDrawer({
                 setDraft((prev) => (prev ? { ...prev, type: event.target.value as ActivityTask['type'] } : prev))
               }
             >
-              <option value="Construct">Construct</option>
-              <option value="Demolish">Demolish</option>
-              <option value="Temporary">Temporary</option>
+              <option value="Construct">{ACTIVITY_TYPE_LABELS.Construct}</option>
+              <option value="Demolish">{ACTIVITY_TYPE_LABELS.Demolish}</option>
+              <option value="Temporary">{ACTIVITY_TYPE_LABELS.Temporary}</option>
             </select>
           </label>
           <div>
-            <div className="mb-1 text-[12px] text-[#6a6e79]">After (predecessors)</div>
+            <div className="mb-1 text-[12px] text-[#6a6e79]">Après (prédécesseurs)</div>
             <div className="max-h-28 overflow-auto rounded border border-[#e6e7ee] p-2">
               {predecessors.map((item) => {
                 const checked = draft.predecessors?.includes(item.id) ?? false;
@@ -151,21 +151,21 @@ export default function ActivityDrawer({
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <modus-date-input ref={actualStartRef} label="Actual start" value={draft.actualStart ?? ''} />
-            <modus-date-input ref={actualEndRef} label="Actual finish" value={draft.actualEnd ?? ''} />
+            <modus-date-input ref={actualStartRef} label="Début réel" value={draft.actualStart ?? ''} />
+            <modus-date-input ref={actualEndRef} label="Fin réelle" value={draft.actualEnd ?? ''} />
           </div>
           <modus-text-input
             ref={progressRef}
-            label="% complete"
+            label="% d'avancement"
             value={String(draft.progressPercent)}
             type="number"
           />
           <div className="flex justify-end gap-2 pt-1">
             <modus-button button-style="outline" color="secondary" size="small" onClick={() => setDraft(null)}>
-              Cancel
+              Annuler
             </modus-button>
             <modus-button color="primary" size="small" onClick={() => onSave(draft)}>
-              Save
+              Enregistrer
             </modus-button>
           </div>
         </div>
@@ -177,7 +177,7 @@ export default function ActivityDrawer({
             <div className="mb-1 flex items-start justify-between gap-2">
               <div>
                 <modus-badge color="success" size="small">
-                  {item.type ?? 'Construct'}
+                  {ACTIVITY_TYPE_LABELS[item.type ?? 'Construct']}
                 </modus-badge>
                 <div className="mt-1 text-[13px] font-medium">{item.name}</div>
               </div>
@@ -194,13 +194,13 @@ export default function ActivityDrawer({
               {item.startDate} → {item.endDate}
             </div>
             <div className="mt-2 flex items-center justify-between text-[12px]">
-              <span className="text-[#6a6e79]">{item.assignedObjectIds.length} objects</span>
+              <span className="text-[#6a6e79]">{item.assignedObjectIds.length} objets</span>
               <button
                 type="button"
                 className="font-medium text-[#0063a3] hover:underline"
                 onClick={() => onAssignSelection(item.id)}
               >
-                Assign selection
+                Assigner la sélection
               </button>
             </div>
           </li>

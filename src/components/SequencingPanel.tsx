@@ -25,13 +25,13 @@ interface SequencingPanelProps {
 }
 
 const SWITCHES: { key: keyof SequencingOptions; label: string }[] = [
-  { key: 'displayGantt', label: 'Gantt chart' },
-  { key: 'statusColors', label: 'Status colors' },
-  { key: 'hideUnbuilt', label: 'Hide unbuilt work' },
-  { key: 'dependencyLinks', label: 'Dependency links' },
-  { key: 'actualProgress', label: 'Actual progress' },
-  { key: 'lateElements', label: 'Late elements' },
-  { key: 'autoOrbit', label: 'Auto-orbit camera' },
+  { key: 'displayGantt', label: 'Diagramme de Gantt' },
+  { key: 'statusColors', label: 'Couleurs de statut' },
+  { key: 'hideUnbuilt', label: 'Masquer le non construit' },
+  { key: 'dependencyLinks', label: 'Liens de dépendance' },
+  { key: 'actualProgress', label: 'Avancement réel' },
+  { key: 'lateElements', label: 'Éléments en retard' },
+  { key: 'autoOrbit', label: 'Orbite caméra auto' },
 ];
 
 export default function SequencingPanel({
@@ -112,7 +112,7 @@ export default function SequencingPanel({
   return (
     <aside className={`flex h-full shrink-0 flex-col bg-white ${fullWidth ? 'w-full' : 'w-[300px] border-l border-[#d0d1db]'}`}>
       <div className="flex items-center justify-between border-b border-[#e6e7ee] px-3 py-2">
-        <span className="text-[14px] font-semibold text-[#252a2e]">4D sequencing</span>
+        <span className="text-[14px] font-semibold text-[#252a2e]">Séquencement 4D</span>
         {onClose && (
           <button type="button" className="rounded p-1 text-[#6a6e79] hover:bg-[#f1f1f6]" onClick={onClose}>
             <X size={16} />
@@ -137,7 +137,7 @@ export default function SequencingPanel({
           <modus-button color="primary" size="small" onClick={onTogglePlay}>
             <span className="inline-flex items-center gap-1">
               {isPlaying ? <Pause size={14} /> : <Play size={14} />}
-              {isPlaying ? 'Pause' : 'Play'}
+              {isPlaying ? 'Pause' : 'Lecture'}
             </span>
           </modus-button>
         </div>
@@ -169,10 +169,10 @@ export default function SequencingPanel({
           ))}
         </div>
 
-        <modus-date-input ref={statusRef} label="Status date" value={statusDate} />
+        <modus-date-input ref={statusRef} label="Date de statut" value={statusDate} />
         {typeof linkedCount === 'number' && (
           <p className="text-[11px] text-[#6a6e79]">
-            {linkedCount} objects linked to the loaded 3D model
+            {linkedCount} objets liés au modèle 3D chargé
           </p>
         )}
       </div>
@@ -182,7 +182,7 @@ export default function SequencingPanel({
         className="flex items-center justify-between border-t border-[#e6e7ee] px-3 py-3 text-[13px] font-medium text-[#252a2e] hover:bg-[#f8f8fb]"
         onClick={onOpenActivities}
       >
-        <span>Activities</span>
+        <span>Activités</span>
         <span className="inline-flex items-center gap-1 text-[#6a6e79]">
           {activityCount}
           <ChevronRight size={14} />

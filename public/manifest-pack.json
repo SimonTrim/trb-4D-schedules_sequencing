@@ -1,5 +1,5 @@
 {
-  "name": "4D schedules",
+  "name": "Planning 4D",
   "version": "1.0.0",
   "api": "1.0",
   "icon": "https://trb-4d-schedules-sequencing.vercel.app/icon-48.png",
@@ -7,16 +7,16 @@
     {
       "type": "projectModule",
       "id": "4d-schedules",
-      "title": "4D schedules",
+      "title": "Planning 4D",
       "icon": "https://trb-4d-schedules-sequencing.vercel.app/icon-48.png",
       "url": "https://trb-4d-schedules-sequencing.vercel.app/",
-      "description": "Every model's construction schedule: full-width Gantt, import/export, progress and baselines.",
+      "description": "Planning de construction de chaque modèle : Gantt, import / export, avancement et références.",
       "enabled": true
     },
     {
       "type": "viewerModule",
       "id": "4d-sequencing",
-      "title": "4D sequencing",
+      "title": "Séquencement 4D",
       "icon": "https://trb-4d-schedules-sequencing.vercel.app/icon-white-48.png",
       "url": "https://trb-4d-schedules-sequencing.vercel.app/?mode=viewer"
     }

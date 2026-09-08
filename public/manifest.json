@@ -1,8 +1,8 @@
 {
   "icon": "https://trb-4d-schedules-sequencing.vercel.app/icon-48.png",
-  "title": "4D schedules",
+  "title": "Planning 4D",
   "url": "https://trb-4d-schedules-sequencing.vercel.app/",
-  "description": "Every model's construction schedule: full-width Gantt, import/export, progress and baselines.",
+  "description": "Planning de construction de chaque modèle : Gantt, import / export, avancement et références.",
   "enabled": true,
   "extensionType": ["project", "3dviewer"]
 }

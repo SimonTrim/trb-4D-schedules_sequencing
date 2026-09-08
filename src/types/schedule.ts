@@ -80,6 +80,25 @@ export interface SequencingOptions {
 
 export type ActivityState = 'Finished' | 'In progress' | 'Behind' | 'Ahead' | 'Not due';
 
+export const ACTIVITY_STATE_LABELS: Record<ActivityState, string> = {
+  Finished: 'Terminée',
+  'In progress': 'En cours',
+  Behind: 'En retard',
+  Ahead: 'En avance',
+  'Not due': 'Non échue',
+};
+
+export const ACTIVITY_TYPE_LABELS: Record<NonNullable<ActivityTask['type']>, string> = {
+  Construct: 'Construction',
+  Demolish: 'Démolition',
+  Temporary: 'Temporaire',
+};
+
+export const STORAGE_STATE_LABELS: Record<IFCModelSchedule['storageState'], string> = {
+  Shared: 'Partagé',
+  Local: 'Local',
+};
+
 export type AppMode = 'project' | 'viewer';
 
 export interface SCurvePoint {

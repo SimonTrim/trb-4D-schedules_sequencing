@@ -59,7 +59,7 @@ export default function ProjectDashboard({
 }: ProjectDashboardProps) {
   const playheadRef = useRef<HTMLElement | null>(null);
   const statusRef = useRef<HTMLElement | null>(null);
-  const selectedName = models.find((m) => m.modelId === selectedModelId)?.modelName ?? 'All models';
+  const selectedName = models.find((m) => m.modelId === selectedModelId)?.modelName ?? 'Tous les modèles';
 
   useEffect(() => {
     const el = playheadRef.current as any;
@@ -90,10 +90,10 @@ export default function ProjectDashboard({
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white px-6 py-4">
       <header className="shrink-0 pb-3">
-        <h1 className="text-[28px] font-semibold leading-tight text-[#252a2e]">4D schedules</h1>
+        <h1 className="text-[28px] font-semibold leading-tight text-[#252a2e]">Planning 4D</h1>
         <p className="mt-1 max-w-3xl text-[13px] text-[#6a6e79]">
-          Every model's construction schedule: read it on a full-width Gantt, import and export, report
-          progress, keep baselines.
+          Planning de construction de chaque modèle : Gantt pleine largeur, import / export, avancement
+          et références.
         </p>
       </header>
 
@@ -114,16 +114,16 @@ export default function ProjectDashboard({
       {(activeTab === 'gantt' || activeTab === 'progress') && (
         <div className="flex flex-wrap items-end gap-4 border-b border-[#e6e7ee] py-3">
           {activeTab === 'gantt' && (
-            <modus-date-input ref={playheadRef} label="Playhead" value={formatIso(playheadDate)} />
+            <modus-date-input ref={playheadRef} label="Curseur" value={formatIso(playheadDate)} />
           )}
-          <modus-date-input ref={statusRef} label="Status date" value={statusDate} />
+          <modus-date-input ref={statusRef} label="Date de statut" value={statusDate} />
           <button
             type="button"
             className="inline-flex items-center gap-1 pb-1 text-[13px] font-medium text-[#0063a3] hover:underline"
             onClick={() => onOpenIn3d(selectedModelId ?? undefined)}
           >
             <ExternalLink size={14} />
-            Open in 3D at this date
+            Ouvrir en 3D à cette date
           </button>
           <button
             type="button"
@@ -131,7 +131,7 @@ export default function ProjectDashboard({
             onClick={onCopyLink}
           >
             <Copy size={14} />
-            Copy link to this date
+            Copier le lien vers cette date
           </button>
         </div>
       )}
@@ -162,17 +162,17 @@ export default function ProjectDashboard({
           <div className="h-full overflow-auto">
             <h3 className="mb-1 text-[16px] font-semibold">Import / export</h3>
             <p className="mb-4 text-[13px] text-[#6a6e79]">
-              Export the 4D dataset or import a compatible JSON schedule.
+              Exportez le jeu de données 4D ou importez un planning JSON compatible.
             </p>
             <div className="flex flex-wrap gap-2">
               <modus-button color="primary" onClick={onExportJson}>
-                Export JSON
+                Exporter JSON
               </modus-button>
               <modus-button color="primary" button-style="outline" onClick={onExportCsv}>
-                Export CSV
+                Exporter CSV
               </modus-button>
               <modus-button color="secondary" onClick={() => fileRef.current?.click()}>
-                Import JSON
+                Importer JSON
               </modus-button>
             </div>
             <input
@@ -191,8 +191,8 @@ export default function ProjectDashboard({
 
         {activeTab === 'baselines' && (
           <div className="h-full overflow-auto text-[13px] text-[#6a6e79]">
-            Baseline comparison is stored with the schedule. Use Progress to review variance against the
-            status date.
+            La comparaison des références est enregistrée avec le planning. Utilisez Avancement pour
+            consulter l’écart par rapport à la date de statut.
           </div>
         )}
       </section>
