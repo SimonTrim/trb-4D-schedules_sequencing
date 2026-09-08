@@ -1,4 +1,8 @@
 {
+  "rewrites": [
+    { "source": "/manifest", "destination": "/manifest.json" },
+    { "source": "/manifes", "destination": "/manifest.json" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
