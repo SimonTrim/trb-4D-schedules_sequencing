@@ -3,5 +3,6 @@
   "title": "4D schedules",
   "url": "https://trb-4d-schedules-sequencing.vercel.app/",
   "description": "Every model's construction schedule: full-width Gantt, import/export, progress and baselines.",
-  "enabled": true
+  "enabled": true,
+  "extensionType": ["project", "3dviewer"]
 }

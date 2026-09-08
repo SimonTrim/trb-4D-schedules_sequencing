@@ -134,6 +134,48 @@ export async function getHostName(workspaceApi: WorkspaceApi | null): Promise<st
   }
 }
 
+export function isViewerHost(host: string | null): boolean {
+  if (!host) return false;
+  const normalized = host.toLowerCase().replace(/[-_\s]/g, '');
+  return normalized.includes('viewer');
+}
+
+const MENU_ICON = 'https://trb-4d-schedules-sequencing.vercel.app/icon-48.png';
+
+export const PROJECT_MENU_COMMANDS = {
+  gantt: '4d.gantt',
+  progress: '4d.progress',
+  import: '4d.import',
+  baselines: '4d.baselines',
+} as const;
+
+export function parseExtensionCommand(data: unknown): string {
+  if (typeof data === 'string') return data.split('?')[0];
+  if (!data || typeof data !== 'object') return '';
+  if ('data' in data) return parseExtensionCommand((data as { data: unknown }).data);
+  if ('command' in data) return String((data as { command: unknown }).command).split('?')[0];
+  return '';
+}
+
+export async function registerProjectMenu(workspaceApi: WorkspaceApi | null) {
+  if (!workspaceApi?.ui?.setMenu) return;
+  try {
+    await workspaceApi.ui.setMenu({
+      title: '4D schedules',
+      icon: MENU_ICON,
+      command: PROJECT_MENU_COMMANDS.gantt,
+      subMenus: [
+        { title: 'Gantt', command: PROJECT_MENU_COMMANDS.gantt },
+        { title: 'Progress', command: PROJECT_MENU_COMMANDS.progress },
+        { title: 'Import / export', command: PROJECT_MENU_COMMANDS.import },
+        { title: 'Baselines', command: PROJECT_MENU_COMMANDS.baselines },
+      ],
+    });
+  } catch (err) {
+    console.warn('setMenu a échoué :', err);
+  }
+}
+
 export async function openIn3dViewer(
   workspaceApi: WorkspaceApi | null,
   modelId?: string,

@@ -8,9 +8,13 @@ import {
   getViewerSelectionIds,
   hideObjects,
   initTrimbleApi,
+  isViewerHost,
   isViewerObjectRef,
   listLoadedObjectRefs,
   openIn3dViewer,
+  parseExtensionCommand,
+  PROJECT_MENU_COMMANDS,
+  registerProjectMenu,
   resetObjectsColor,
   selectActivityObjects,
   setObjectsColor,
@@ -181,9 +185,19 @@ export default function App() {
       if (!cancelled) setApi(null);
     }, 8000);
 
-    initTrimbleApi((event) => {
+    initTrimbleApi((event, data) => {
       if (event === 'viewer.modelLoaded') {
         setModelEpoch((value) => value + 1);
+      }
+      if (event === 'extension.command') {
+        const command = parseExtensionCommand(data);
+        const tab = (Object.entries(PROJECT_MENU_COMMANDS) as [DashboardTab, string][]).find(
+          ([, value]) => value === command,
+        )?.[0];
+        if (tab) {
+          applyMode('project');
+          setActiveTab(tab);
+        }
       }
     }).then(async (workspace) => {
       if (cancelled) return;
@@ -192,9 +206,12 @@ export default function App() {
       const inIframe = window.self !== window.top;
       setEmbedded(inIframe);
       const host = await getHostName(workspace);
-      if (host === 'viewer3d') applyMode('viewer');
+      if (isViewerHost(host)) applyMode('viewer');
       else if (host === 'project') applyMode('project');
-      if (workspace && (host === 'viewer3d' || inIframe)) {
+      if (workspace && !isViewerHost(host)) {
+        await registerProjectMenu(workspace);
+      }
+      if (workspace && (isViewerHost(host) || inIframe)) {
         const count = await bindLoadedObjects(workspace);
         if (count > 0) showToast(`${count} objects linked from the 3D model`);
       }

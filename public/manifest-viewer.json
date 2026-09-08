@@ -1,5 +1,7 @@
 {
   "icon": "https://trb-4d-schedules-sequencing.vercel.app/icon-white-48.png",
   "title": "4D sequencing",
-  "url": "https://trb-4d-schedules-sequencing.vercel.app/?mode=viewer"
+  "url": "https://trb-4d-schedules-sequencing.vercel.app/?mode=viewer",
+  "description": "4D sequencing panel in the 3D Viewer.",
+  "extensionType": ["3dviewer"]
 }
