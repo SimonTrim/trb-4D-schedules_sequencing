@@ -36,6 +36,7 @@ import {
   resolveActivityStatusAtDate,
   resolveObjectStatus,
 } from './services/mockData';
+import { addDependency, removeDependency } from './services/scheduleLinks';
 import {
   ActivityTask,
   AppMode,
@@ -95,6 +96,7 @@ export default function App() {
   const [statusDate, setStatusDate] = useState(STATUS_DATE);
   const [drawerActivity, setDrawerActivity] = useState<ActivityTask | null>(null);
   const [viewerPanel, setViewerPanel] = useState<'sequencing' | 'activities'>('sequencing');
+  const [linkMode, setLinkMode] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [modelEpoch, setModelEpoch] = useState(0);
   const tabsRef = useRef<HTMLElement | null>(null);
@@ -385,6 +387,40 @@ export default function App() {
     }
   };
 
+  const changeActivity = (next: ActivityTask) => {
+    setActivities((prev) => prev.map((item) => (item.id === next.id ? next : item)));
+    setDrawerActivity((current) => (current?.id === next.id ? next : current));
+  };
+
+  const linkActivities = (fromId: string, toId: string) => {
+    setActivities((prev) => {
+      const next = addDependency(prev, fromId, toId);
+      if (next === prev) {
+        showToast('Liaison impossible (cycle ou déjà existante)');
+        return prev;
+      }
+      showToast('Liaison Fin → Début ajoutée');
+      return next;
+    });
+  };
+
+  const unlinkActivities = (fromId: string, toId: string) => {
+    setActivities((prev) => removeDependency(prev, fromId, toId));
+    showToast('Liaison supprimée');
+  };
+
+  const deleteActivity = (id: string) => {
+    setActivities((prev) =>
+      prev
+        .filter((item) => item.id !== id)
+        .map((item) => ({
+          ...item,
+          predecessors: (item.predecessors ?? []).filter((predId) => predId !== id),
+        })),
+    );
+    if (drawerActivity?.id === id) setDrawerActivity(null);
+  };
+
   return (
     <div className="flex h-full flex-col overflow-hidden bg-white">
       <DemoChrome
@@ -429,6 +465,11 @@ export default function App() {
             onImportFile={importFile}
             onCreateActivity={createActivity}
             onLoadExample={loadExample}
+            linkMode={linkMode}
+            onToggleLinkMode={() => setLinkMode((value) => !value)}
+            onChangeActivity={changeActivity}
+            onLinkActivities={linkActivities}
+            onUnlinkActivities={unlinkActivities}
           />
             </div>
             <ActivityDrawer
@@ -438,15 +479,13 @@ export default function App() {
               onClose={() => setDrawerActivity(null)}
               onCreate={createActivity}
               onEdit={openActivity}
-              onDelete={(id) => {
-                setActivities((prev) => prev.filter((item) => item.id !== id));
-                if (drawerActivity?.id === id) setDrawerActivity(null);
-              }}
+              onDelete={deleteActivity}
               onSave={(next) => {
-                setActivities((prev) => prev.map((item) => (item.id === next.id ? next : item)));
-                setDrawerActivity(next);
+                changeActivity(next);
                 showToast('Activité enregistrée');
               }}
+              onLink={linkActivities}
+              onUnlink={unlinkActivities}
               onAssignSelection={async (activityId) => {
                 const fallback = api
                   ? await getViewerSelectionIds(api)
@@ -488,15 +527,16 @@ export default function App() {
             onCloseActivities={() => setViewerPanel('sequencing')}
             onSelectActivity={openActivity}
             onCreateActivity={createActivity}
-            onDeleteActivity={(id) => {
-              setActivities((prev) => prev.filter((a) => a.id !== id));
-              if (drawerActivity?.id === id) setDrawerActivity(null);
-            }}
+            onDeleteActivity={deleteActivity}
             onSaveActivity={(next) => {
-              setActivities((prev) => prev.map((a) => (a.id === next.id ? next : a)));
-              setDrawerActivity(next);
+              changeActivity(next);
               showToast('Activité enregistrée');
             }}
+            linkMode={linkMode}
+            onToggleLinkMode={() => setLinkMode((value) => !value)}
+            onChangeActivity={changeActivity}
+            onLinkActivities={linkActivities}
+            onUnlinkActivities={unlinkActivities}
             onAssignSelection={async (activityId) => {
               const fallback = api
                 ? await getViewerSelectionIds(api)

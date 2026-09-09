@@ -4,6 +4,7 @@ import { ActivityTask, DashboardTab, IFCModelSchedule, ProgressRecord, Sequencin
 import { formatIso } from '../services/mockData';
 import ScheduleTable from './ScheduleTable';
 import GanttChart from './GanttChart';
+import LinkEditor from './LinkEditor';
 import ProgressAnalytics from './ProgressAnalytics';
 
 interface ProjectDashboardProps {
@@ -32,6 +33,11 @@ interface ProjectDashboardProps {
   onImportFile: (file: File) => void;
   onCreateActivity: () => void;
   onLoadExample: () => void;
+  linkMode: boolean;
+  onToggleLinkMode: () => void;
+  onChangeActivity: (next: ActivityTask) => void;
+  onLinkActivities: (fromId: string, toId: string) => void;
+  onUnlinkActivities: (fromId: string, toId: string) => void;
 }
 
 export default function ProjectDashboard({
@@ -60,6 +66,11 @@ export default function ProjectDashboard({
   onImportFile,
   onCreateActivity,
   onLoadExample,
+  linkMode,
+  onToggleLinkMode,
+  onChangeActivity,
+  onLinkActivities,
+  onUnlinkActivities,
 }: ProjectDashboardProps) {
   const playheadRef = useRef<HTMLElement | null>(null);
   const statusRef = useRef<HTMLElement | null>(null);
@@ -142,19 +153,34 @@ export default function ProjectDashboard({
 
       <section className="min-h-0 flex-1 overflow-hidden pt-3">
         {activeTab === 'gantt' && (
-          <div className="h-full overflow-hidden rounded border border-[#e6e7ee]">
-            <GanttChart
+          <div className="flex h-full min-h-0 flex-col overflow-hidden rounded border border-[#e6e7ee]">
+            <LinkEditor
               activities={activities}
-              progress={progress}
-              playheadDate={playheadDate}
-              statusDate={statusDate}
-              options={options}
-              selectedActivityId={selectedActivityId}
-              onSelectActivity={onSelectActivity}
-              onPlayheadChange={onPlayheadChange}
-              onCreateActivity={onCreateActivity}
-              emptyHint="Aucune activité. Créez le planning depuis zéro ou importez un fichier 4D."
+              selectedId={selectedActivityId}
+              linkMode={linkMode}
+              onToggleLinkMode={onToggleLinkMode}
+              onLink={onLinkActivities}
+              onUnlink={onUnlinkActivities}
             />
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <GanttChart
+                activities={activities}
+                progress={progress}
+                playheadDate={playheadDate}
+                statusDate={statusDate}
+                options={options}
+                selectedActivityId={selectedActivityId}
+                linkMode={linkMode}
+                onToggleLinkMode={onToggleLinkMode}
+                onSelectActivity={onSelectActivity}
+                onPlayheadChange={onPlayheadChange}
+                onCreateActivity={onCreateActivity}
+                onChangeActivity={onChangeActivity}
+                onLinkActivities={onLinkActivities}
+                onUnlinkActivities={onUnlinkActivities}
+                emptyHint="Aucune activité. Créez le planning depuis zéro ou importez un fichier 4D."
+              />
+            </div>
           </div>
         )}
 

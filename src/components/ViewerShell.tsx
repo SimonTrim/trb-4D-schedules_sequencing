@@ -37,6 +37,11 @@ interface ViewerShellProps {
   onDeleteActivity: (id: string) => void;
   onSaveActivity: (next: ActivityTask) => void;
   onAssignSelection: (activityId: string) => void;
+  linkMode: boolean;
+  onToggleLinkMode: () => void;
+  onChangeActivity: (next: ActivityTask) => void;
+  onLinkActivities: (fromId: string, toId: string) => void;
+  onUnlinkActivities: (fromId: string, toId: string) => void;
 }
 
 export default function ViewerShell({
@@ -67,6 +72,11 @@ export default function ViewerShell({
   onDeleteActivity,
   onSaveActivity,
   onAssignSelection,
+  linkMode,
+  onToggleLinkMode,
+  onChangeActivity,
+  onLinkActivities,
+  onUnlinkActivities,
 }: ViewerShellProps) {
   const sidePanel = panel === 'sequencing' ? (
     <SequencingPanel
@@ -99,6 +109,8 @@ export default function ViewerShell({
       onDelete={onDeleteActivity}
       onSave={onSaveActivity}
       onAssignSelection={onAssignSelection}
+      onLink={onLinkActivities}
+      onUnlink={onUnlinkActivities}
     />
   );
 
@@ -112,9 +124,14 @@ export default function ViewerShell({
         options={options}
         selectedActivityId={selectedActivity?.id ?? null}
         compact
+        linkMode={linkMode}
+        onToggleLinkMode={onToggleLinkMode}
         onSelectActivity={onSelectActivity}
         onPlayheadChange={onPlayheadChange}
         onCreateActivity={onCreateActivity}
+        onChangeActivity={onChangeActivity}
+        onLinkActivities={onLinkActivities}
+        onUnlinkActivities={onUnlinkActivities}
       />
     </div>
   ) : null;

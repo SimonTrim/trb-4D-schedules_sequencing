@@ -17,7 +17,7 @@
       "type": "viewerModule",
       "id": "4d-sequencing",
       "title": "Séquencement 4D",
-      "icon": "https://trb-4d-schedules-sequencing.vercel.app/icon-black-48.png",
+      "icon": "https://trb-4d-schedules-sequencing.vercel.app/icon-viewer-v3.png",
       "url": "https://trb-4d-schedules-sequencing.vercel.app/?mode=viewer"
     }
   ],

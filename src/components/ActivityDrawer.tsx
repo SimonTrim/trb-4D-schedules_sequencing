@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
 import { ACTIVITY_TYPE_LABELS, ActivityTask } from '../types/schedule';
+import { successorsOf } from '../services/scheduleLinks';
 
 interface ActivityDrawerProps {
   activities: ActivityTask[];
@@ -12,6 +13,8 @@ interface ActivityDrawerProps {
   onDelete: (id: string) => void;
   onSave: (next: ActivityTask) => void;
   onAssignSelection: (activityId: string) => void;
+  onLink?: (fromId: string, toId: string) => void;
+  onUnlink?: (fromId: string, toId: string) => void;
 }
 
 export default function ActivityDrawer({
@@ -24,6 +27,8 @@ export default function ActivityDrawer({
   onDelete,
   onSave,
   onAssignSelection,
+  onLink,
+  onUnlink,
 }: ActivityDrawerProps) {
   const [draft, setDraft] = useState<ActivityTask | null>(activity);
   const nameRef = useRef<HTMLElement | null>(null);
@@ -40,6 +45,10 @@ export default function ActivityDrawer({
   const predecessors = useMemo(
     () => activities.filter((item) => item.id !== draft?.id),
     [activities, draft?.id],
+  );
+  const successors = useMemo(
+    () => (draft ? successorsOf(activities, draft.id) : []),
+    [activities, draft],
   );
 
   useEffect(() => {
@@ -132,6 +141,7 @@ export default function ActivityDrawer({
                       type="checkbox"
                       checked={checked}
                       onChange={() => {
+                        if (!draft) return;
                         setDraft((prev) => {
                           if (!prev) return prev;
                           const current = prev.predecessors ?? [];
@@ -142,6 +152,30 @@ export default function ActivityDrawer({
                               : [...current, item.id],
                           };
                         });
+                        if (checked) onUnlink?.(item.id, draft.id);
+                        else onLink?.(item.id, draft.id);
+                      }}
+                    />
+                    <span className="truncate">{item.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <div className="mb-1 text-[12px] text-[#6a6e79]">Avant (successeurs)</div>
+            <div className="max-h-28 overflow-auto rounded border border-[#e6e7ee] p-2">
+              {predecessors.map((item) => {
+                const checked = successors.some((succ) => succ.id === item.id);
+                return (
+                  <label key={item.id} className="flex items-center gap-2 py-0.5 text-[12px]">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        if (!draft) return;
+                        if (checked) onUnlink?.(draft.id, item.id);
+                        else onLink?.(draft.id, item.id);
                       }}
                     />
                     <span className="truncate">{item.name}</span>
