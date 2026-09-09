@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronRight, Box } from 'lucide-react';
 import { IFCModelSchedule, STORAGE_STATE_LABELS } from '../types/schedule';
-import { formatIso, UNSCHEDULED_MODEL_COUNT } from '../services/mockData';
+import { formatIso } from '../services/mockData';
 
 interface ScheduleTableProps {
   models: IFCModelSchedule[];
@@ -19,8 +19,7 @@ export default function ScheduleTable({
   onSelectModel,
   onOpenIn3d,
 }: ScheduleTableProps) {
-  const scheduled = models.length;
-  const total = scheduled + UNSCHEDULED_MODEL_COUNT;
+  const scheduled = models.filter((model) => model.activitiesCount > 0).length;
 
   return (
     <section className="border-b border-[#e6e7ee]">
@@ -32,7 +31,7 @@ export default function ScheduleTable({
         {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         <span className="font-semibold">Modèles</span>
         <span className="text-[#6a6e79]">
-          {total} modèles · {scheduled} avec un planning
+          {models.length} modèle{models.length > 1 ? 's' : ''} · {scheduled} avec un planning
         </span>
       </button>
 

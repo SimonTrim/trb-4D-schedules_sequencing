@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { importScheduleFile } from './services/scheduleImport';
 import DemoChrome from './components/DemoChrome';
 import ProjectDashboard from './components/ProjectDashboard';
 import ViewerShell from './components/ViewerShell';
+import ActivityDrawer from './components/ActivityDrawer';
 import {
-  distributeObjectRefs,
   getHostName,
+  getLoadedModels,
   getViewerSelectionIds,
   hideObjects,
   initTrimbleApi,
   isViewerHost,
   isViewerObjectRef,
-  listLoadedObjectRefs,
   openIn3dViewer,
   parseExtensionCommand,
   PROJECT_MENU_COMMAND,
@@ -23,10 +24,10 @@ import {
 } from './services/trimbleApi';
 import {
   MOCK_ACTIVITIES,
-  MOCK_MODELS,
   MOCK_OBJECTS,
   MOCK_PROGRESS,
   STATUS_DATE,
+  buildScheduleModels,
   dateToPercent,
   formatIso,
   getProjectDateRange,
@@ -39,7 +40,6 @@ import {
   ActivityTask,
   AppMode,
   DashboardTab,
-  IFCModelSchedule,
   ProgressRecord,
   SequencingOptions,
   STATUS_CONFIGS,
@@ -62,7 +62,7 @@ const DEFAULT_OPTIONS: SequencingOptions = {
   autoOrbit: false,
 };
 
-const STORAGE_KEY = 'tc-4d-schedule-v1';
+const STORAGE_KEY = 'tc-4d-schedule-v2';
 
 function readModeFromUrl(): AppMode {
   return new URLSearchParams(window.location.search).get('mode') === 'viewer' ? 'viewer' : 'project';
@@ -83,10 +83,10 @@ export default function App() {
   const [api, setApi] = useState<WorkspaceApi | null>(null);
   const [mode, setMode] = useState<AppMode>(readModeFromUrl);
   const [embedded, setEmbedded] = useState(false);
-  const [models] = useState<IFCModelSchedule[]>(MOCK_MODELS);
-  const [activities, setActivities] = useState<ActivityTask[]>(() => loadStoredActivities() ?? MOCK_ACTIVITIES);
-  const [progress] = useState<ProgressRecord[]>(MOCK_PROGRESS);
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(MOCK_MODELS[0].modelId);
+  const [loadedModels, setLoadedModels] = useState<Array<{ id: string; name?: string }>>([]);
+  const [activities, setActivities] = useState<ActivityTask[]>(() => loadStoredActivities() ?? []);
+  const [progress, setProgress] = useState<ProgressRecord[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>('project');
   const [modelsExpanded, setModelsExpanded] = useState(true);
   const [activeTab, setActiveTab] = useState<DashboardTab>('gantt');
   const [options, setOptions] = useState<SequencingOptions>(DEFAULT_OPTIONS);
@@ -100,6 +100,11 @@ export default function App() {
   const tabsRef = useRef<HTMLElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
+  const models = useMemo(
+    () => buildScheduleModels(activities, loadedModels, statusDate),
+    [activities, loadedModels, statusDate],
+  );
+
   const range = useMemo(() => getProjectDateRange(activities), [activities]);
   const [playheadPercent, setPlayheadPercent] = useState(() =>
     dateToPercent(parseIso(STATUS_DATE), range.start, range.end),
@@ -110,7 +115,10 @@ export default function App() {
   );
 
   const filteredActivities = useMemo(
-    () => (selectedModelId && !embedded ? activities.filter((a) => a.modelId === selectedModelId) : activities),
+    () =>
+      selectedModelId && !embedded
+        ? activities.filter((activity) => (activity.modelId ?? 'project') === selectedModelId)
+        : activities,
     [activities, selectedModelId, embedded],
   );
 
@@ -156,19 +164,14 @@ export default function App() {
   }, []);
 
   const bindLoadedObjects = useCallback(async (workspace: WorkspaceApi) => {
-    const refs = await listLoadedObjectRefs(workspace);
-    if (refs.length === 0) return 0;
-    setActivities((prev) => {
-      const known = new Set(prev.flatMap((a) => a.assignedObjectIds.filter(isViewerObjectRef)));
-      const overlap = refs.some((ref) => known.has(ref));
-      if (overlap && known.size > 0) return prev;
-      const buckets = distributeObjectRefs(refs, prev.length);
-      return prev.map((activity, index) => ({
-        ...activity,
-        assignedObjectIds: buckets[index] ?? [],
-      }));
-    });
-    return refs.length;
+    const loaded = await getLoadedModels(workspace);
+    setLoadedModels(
+      loaded.map((model) => ({
+        id: String((model as { id?: string }).id ?? ''),
+        name: (model as { name?: string }).name,
+      })).filter((model) => model.id),
+    );
+    return loaded.length;
   }, []);
 
   useEffect(() => {
@@ -207,7 +210,7 @@ export default function App() {
       }
       if (workspace && (isViewerHost(host) || inIframe)) {
         const count = await bindLoadedObjects(workspace);
-        if (count > 0) showToast(`${count} objets liés au modèle 3D`);
+        if (count > 0) showToast(`${count} modèle(s) chargé(s) — assignez une sélection à une activité`);
       }
     });
 
@@ -220,7 +223,7 @@ export default function App() {
   useEffect(() => {
     if (!api || modelEpoch === 0) return;
     bindLoadedObjects(api).then((count) => {
-        if (count > 0) showToast(`${count} objets liés au modèle 3D`);
+      if (count > 0) showToast(`${count} modèle(s) chargé(s) — assignez une sélection à une activité`);
     });
   }, [api, modelEpoch, bindLoadedObjects, showToast]);
 
@@ -324,14 +327,40 @@ export default function App() {
     showToast('Export CSV généré');
   };
 
-  const importJson = async (file: File) => {
+  const importFile = async (file: File) => {
     try {
-      const parsed = JSON.parse(await file.text());
-      if (Array.isArray(parsed.activities)) setActivities(parsed.activities);
-      showToast('Planning importé');
-    } catch {
-      showToast('Fichier JSON invalide');
+      const result = await importScheduleFile(file);
+      setActivities(result.activities);
+      setProgress([]);
+      setDrawerActivity(result.activities[0] ?? null);
+      setActiveTab('gantt');
+      showToast(`${result.activities.length} activités importées (${result.format})`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Import impossible');
     }
+  };
+
+  const createActivity = () => {
+    const created: ActivityTask = {
+      id: `act-${Date.now()}`,
+      name: 'Nouvelle activité',
+      startDate: formatIso(playheadDate),
+      endDate: formatIso(playheadDate),
+      progressPercent: 0,
+      assignedObjectIds: [],
+      modelId: selectedModelId && selectedModelId !== 'project' ? selectedModelId : undefined,
+      type: 'Construct',
+    };
+    setActivities((prev) => [...prev, created]);
+    setDrawerActivity(created);
+    if (mode === 'viewer') setViewerPanel('activities');
+  };
+
+  const loadExample = () => {
+    setActivities(MOCK_ACTIVITIES);
+    setProgress(MOCK_PROGRESS);
+    setSelectedModelId(MOCK_ACTIVITIES[0]?.modelId ?? 'project');
+    showToast('Exemple de planning chargé');
   };
 
   const openIn3d = async (modelId?: string) => {
@@ -367,7 +396,9 @@ export default function App() {
 
       <main className="min-h-0 flex-1 overflow-hidden">
         {mode === 'project' ? (
-          <ProjectDashboard
+          <div className="flex h-full min-h-0">
+            <div className="min-h-0 min-w-0 flex-1">
+              <ProjectDashboard
             models={models}
             selectedModelId={selectedModelId}
             modelsExpanded={modelsExpanded}
@@ -395,8 +426,42 @@ export default function App() {
             onCopyLink={copyLink}
             onExportJson={exportJson}
             onExportCsv={exportCsv}
-            onImportJson={importJson}
+            onImportFile={importFile}
+            onCreateActivity={createActivity}
+            onLoadExample={loadExample}
           />
+            </div>
+            <ActivityDrawer
+              activities={activities}
+              activity={drawerActivity}
+              open={Boolean(drawerActivity)}
+              onClose={() => setDrawerActivity(null)}
+              onCreate={createActivity}
+              onEdit={openActivity}
+              onDelete={(id) => {
+                setActivities((prev) => prev.filter((item) => item.id !== id));
+                if (drawerActivity?.id === id) setDrawerActivity(null);
+              }}
+              onSave={(next) => {
+                setActivities((prev) => prev.map((item) => (item.id === next.id ? next : item)));
+                setDrawerActivity(next);
+                showToast('Activité enregistrée');
+              }}
+              onAssignSelection={async (activityId) => {
+                const fallback = api
+                  ? await getViewerSelectionIds(api)
+                  : visibleObjects.filter((o) => !o.hidden).slice(0, 2).map((o) => o.id);
+                setActivities((prev) =>
+                  prev.map((item) => (item.id === activityId ? { ...item, assignedObjectIds: fallback } : item)),
+                );
+                showToast(
+                  fallback.length
+                    ? `${fallback.length} objets assignés`
+                    : 'Aucune sélection. Ouvrez le viewer 3D, sélectionnez des objets, puis réessayez.',
+                );
+              }}
+            />
+          </div>
         ) : (
           <ViewerShell
             embedded={embedded}
@@ -422,20 +487,7 @@ export default function App() {
             onOpenActivities={() => setViewerPanel('activities')}
             onCloseActivities={() => setViewerPanel('sequencing')}
             onSelectActivity={openActivity}
-            onCreateActivity={() => {
-              const created: ActivityTask = {
-                id: `act-${Date.now()}`,
-                name: 'Nouvelle activité',
-                startDate: formatIso(playheadDate),
-                endDate: formatIso(playheadDate),
-                progressPercent: 0,
-                assignedObjectIds: [],
-                modelId: selectedModelId ?? undefined,
-                type: 'Construct',
-              };
-              setActivities((prev) => [...prev, created]);
-              setDrawerActivity(created);
-            }}
+            onCreateActivity={createActivity}
             onDeleteActivity={(id) => {
               setActivities((prev) => prev.filter((a) => a.id !== id));
               if (drawerActivity?.id === id) setDrawerActivity(null);

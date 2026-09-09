@@ -311,9 +311,65 @@ export function formatFr(date: string | Date): string {
 }
 
 export function getProjectDateRange(activities: ActivityTask[]): { start: Date; end: Date } {
+  if (activities.length === 0) {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 90);
+    return { start, end };
+  }
   const starts = activities.map((a) => parseIso(a.startDate).getTime());
   const ends = activities.map((a) => parseIso(a.endDate).getTime());
   return { start: new Date(Math.min(...starts)), end: new Date(Math.max(...ends)) };
+}
+
+export function buildScheduleModels(
+  activities: ActivityTask[],
+  loadedModels: Array<{ id: string; name?: string }>,
+  statusDate: string,
+): IFCModelSchedule[] {
+  const byModel = new Map<string, ActivityTask[]>();
+  activities.forEach((activity) => {
+    const key = activity.modelId ?? 'project';
+    const list = byModel.get(key) ?? [];
+    list.push(activity);
+    byModel.set(key, list);
+  });
+  loadedModels.forEach((model) => {
+    if (!byModel.has(model.id)) byModel.set(model.id, []);
+  });
+  if (byModel.size === 0) {
+    const today = formatIso(new Date());
+    return [
+      {
+        modelId: 'project',
+        modelName: 'Planning du projet',
+        activitiesCount: 0,
+        startDate: today,
+        endDate: today,
+        statusDate,
+        objectsCount: 0,
+        linksCount: 0,
+        storageState: 'Local',
+      },
+    ];
+  }
+  return [...byModel.entries()].map(([id, acts]) => {
+    const loaded = loadedModels.find((model) => model.id === id);
+    const range = acts.length ? getProjectDateRange(acts) : { start: new Date(), end: new Date() };
+    return {
+      modelId: id,
+      modelName: loaded?.name ?? (id === 'project' ? 'Planning du projet' : id),
+      activitiesCount: acts.length,
+      startDate: formatIso(range.start),
+      endDate: formatIso(range.end),
+      statusDate,
+      objectsCount: acts.reduce((sum, act) => sum + act.assignedObjectIds.length, 0),
+      linksCount: acts.reduce((sum, act) => sum + (act.predecessors?.length ?? 0), 0),
+      storageState: loaded ? 'Shared' : 'Local',
+      lateCount: acts.filter((act) => isActivityLate(act, statusDate)).length || undefined,
+    };
+  });
 }
 
 export function dateToPercent(date: Date, start: Date, end: Date): number {

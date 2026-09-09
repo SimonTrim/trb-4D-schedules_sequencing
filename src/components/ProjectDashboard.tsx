@@ -29,7 +29,9 @@ interface ProjectDashboardProps {
   onCopyLink: () => void;
   onExportJson: () => void;
   onExportCsv: () => void;
-  onImportJson: (file: File) => void;
+  onImportFile: (file: File) => void;
+  onCreateActivity: () => void;
+  onLoadExample: () => void;
 }
 
 export default function ProjectDashboard({
@@ -55,7 +57,9 @@ export default function ProjectDashboard({
   onCopyLink,
   onExportJson,
   onExportCsv,
-  onImportJson,
+  onImportFile,
+  onCreateActivity,
+  onLoadExample,
 }: ProjectDashboardProps) {
   const playheadRef = useRef<HTMLElement | null>(null);
   const statusRef = useRef<HTMLElement | null>(null);
@@ -148,6 +152,8 @@ export default function ProjectDashboard({
               selectedActivityId={selectedActivityId}
               onSelectActivity={onSelectActivity}
               onPlayheadChange={onPlayheadChange}
+              onCreateActivity={onCreateActivity}
+              emptyHint="Aucune activité. Créez le planning depuis zéro ou importez un fichier 4D."
             />
           </div>
         )}
@@ -161,28 +167,42 @@ export default function ProjectDashboard({
         {activeTab === 'import' && (
           <div className="h-full overflow-auto">
             <h3 className="mb-1 text-[16px] font-semibold">Import / export</h3>
-            <p className="mb-4 text-[13px] text-[#6a6e79]">
-              Exportez le jeu de données 4D ou importez un planning JSON compatible.
+            <p className="mb-3 text-[13px] text-[#6a6e79]">
+              Le planning démarre vide. Importez un fichier 4D ou créez les activités une par une, puis
+              assignez les objets 3D depuis le viewer.
             </p>
+            <ul className="mb-4 list-disc pl-5 text-[13px] text-[#6a6e79]">
+              <li>JSON Planning 4D (export natif)</li>
+              <li>CSV (nom, dates, avancement, prédécesseurs)</li>
+              <li>Microsoft Project XML (.xml)</li>
+              <li>Primavera P6 XML (.xml)</li>
+              <li>Primavera XER (.xer)</li>
+            </ul>
             <div className="flex flex-wrap gap-2">
-              <modus-button color="primary" onClick={onExportJson}>
+              <modus-button color="primary" onClick={() => fileRef.current?.click()}>
+                Importer un planning
+              </modus-button>
+              <modus-button color="primary" button-style="outline" onClick={onCreateActivity}>
+                Nouvelle activité
+              </modus-button>
+              <modus-button color="secondary" onClick={onLoadExample}>
+                Charger un exemple
+              </modus-button>
+              <modus-button color="secondary" button-style="outline" onClick={onExportJson}>
                 Exporter JSON
               </modus-button>
-              <modus-button color="primary" button-style="outline" onClick={onExportCsv}>
+              <modus-button color="secondary" button-style="outline" onClick={onExportCsv}>
                 Exporter CSV
-              </modus-button>
-              <modus-button color="secondary" onClick={() => fileRef.current?.click()}>
-                Importer JSON
               </modus-button>
             </div>
             <input
               ref={fileRef as React.Ref<HTMLInputElement>}
               type="file"
-              accept="application/json"
+              accept=".json,.csv,.xml,.xer,.txt,application/json,text/csv,text/xml"
               className="hidden"
               onChange={(event) => {
                 const file = event.target.files?.[0];
-                if (file) onImportJson(file);
+                if (file) onImportFile(file);
                 event.target.value = '';
               }}
             />

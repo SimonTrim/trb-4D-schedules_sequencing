@@ -114,6 +114,7 @@ export default function ViewerShell({
         compact
         onSelectActivity={onSelectActivity}
         onPlayheadChange={onPlayheadChange}
+        onCreateActivity={onCreateActivity}
       />
     </div>
   ) : null;

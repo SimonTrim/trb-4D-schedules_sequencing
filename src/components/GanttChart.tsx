@@ -18,8 +18,10 @@ interface GanttChartProps {
   options: SequencingOptions;
   selectedActivityId: string | null;
   compact?: boolean;
+  emptyHint?: string;
   onSelectActivity: (activity: ActivityTask) => void;
   onPlayheadChange: (percent: number) => void;
+  onCreateActivity?: () => void;
 }
 
 const LABEL_W = 280;
@@ -36,8 +38,10 @@ export default function GanttChart({
   options,
   selectedActivityId,
   compact = false,
+  emptyHint,
   onSelectActivity,
   onPlayheadChange,
+  onCreateActivity,
 }: GanttChartProps) {
   const [zoom, setZoom] = useState(1);
   const range = useMemo(() => getProjectDateRange(activities), [activities]);
@@ -77,8 +81,13 @@ export default function GanttChart({
           </span>
           {!compact && (
             <span>
-              Cliquez sur une barre pour sélectionner ses objets. Les onglets du haut permettent de changer de vue.
+              Cliquez sur une barre pour sélectionner ses objets 3D. Créez une activité ou importez un planning.
             </span>
+          )}
+          {!compact && onCreateActivity && (
+            <modus-button color="primary" size="small" button-style="outline" onClick={onCreateActivity}>
+              Nouvelle activité
+            </modus-button>
           )}
           <span className="inline-flex items-center gap-3">
             <span className="inline-flex items-center gap-1">
@@ -120,6 +129,18 @@ export default function GanttChart({
         </div>
       </div>
 
+      {activities.length === 0 ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+          <p className="text-[14px] text-[#6a6e79]">
+            {emptyHint ?? 'Aucun planning pour le moment. Créez une activité ou importez un fichier 4D.'}
+          </p>
+          {onCreateActivity && (
+            <modus-button color="primary" size="small" onClick={onCreateActivity}>
+              Créer une activité
+            </modus-button>
+          )}
+        </div>
+      ) : (
       <div className="min-h-0 flex-1 overflow-auto">
         <svg
           viewBox={`0 0 ${width} ${height}`}
@@ -259,6 +280,7 @@ export default function GanttChart({
           />
         </svg>
       </div>
+      )}
     </div>
   );
 }
