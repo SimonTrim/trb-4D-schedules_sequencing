@@ -5,7 +5,6 @@ import {
   dateToPercent,
   formatIso,
   formatShort,
-  getActivityState,
   getProjectDateRange,
   isActivityLate,
   parseIso,
@@ -30,12 +29,18 @@ interface GanttChartProps {
   onUnlinkActivities?: (fromId: string, toId: string) => void;
 }
 
-const LABEL_W = 280;
+const DEFAULT_LABEL_W = 280;
+const MIN_LABEL_W = 180;
+const MAX_LABEL_W = 560;
+const LABEL_W_KEY = 'tc-4d-gantt-label-w';
 const ROW_H = 32;
-const HEAD_H = 40;
-const BAR_Y = 9;
-const BAR_H = 14;
-const PLANNED = '#22c55e';
+const HEAD_H = 44;
+const BAR_Y = 8;
+const BAR_H = 16;
+const PLANNED_DONE = '#16a34a';
+const PLANNED_TODO = '#86efac';
+const LATE_DONE = '#dc2626';
+const LATE_TODO = '#fca5a5';
 const PLAYHEAD = '#217cbb';
 const STATUS = '#ef4444';
 const LINK = '#6a6e79';
@@ -43,6 +48,7 @@ const STUB = 10;
 const ARROW_GAP = 8;
 
 type DragKind = 'move' | 'start' | 'end';
+type PointerMode = 'bar' | 'playhead' | 'column' | null;
 
 interface BarGeom {
   x: number;
@@ -51,12 +57,23 @@ interface BarGeom {
   cy: number;
 }
 
-interface DragState {
+interface BarDragState {
   id: string;
   kind: DragKind;
   originX: number;
   startDate: string;
   endDate: string;
+}
+
+function readLabelWidth(): number {
+  try {
+    const raw = localStorage.getItem(LABEL_W_KEY);
+    const value = raw ? Number(raw) : DEFAULT_LABEL_W;
+    if (!Number.isFinite(value)) return DEFAULT_LABEL_W;
+    return Math.max(MIN_LABEL_W, Math.min(MAX_LABEL_W, value));
+  } catch {
+    return DEFAULT_LABEL_W;
+  }
 }
 
 function addDays(iso: string, days: number): string {
@@ -72,10 +89,37 @@ function minDuration(start: string, end: string): { startDate: string; endDate: 
   return { startDate: start, endDate: end };
 }
 
-function barGeom(activity: ActivityTask, range: { start: Date; end: Date }, chartW: number, index: number): BarGeom {
+function formatCursor(date: Date): string {
+  return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }).replace('.', '');
+}
+
+function truncateToWidth(text: string, px: number): string {
+  const max = Math.max(0, Math.floor(px / 6.4));
+  if (max < 2) return '';
+  if (text.length <= max) return text;
+  return `${text.slice(0, Math.max(1, max - 1))}…`;
+}
+
+function playheadProgress(activity: ActivityTask, playhead: Date): number {
+  const start = parseIso(activity.startDate).getTime();
+  const end = parseIso(activity.endDate).getTime();
+  const time = playhead.getTime();
+  if (time <= start) return 0;
+  if (time >= end) return 1;
+  if (end <= start) return 1;
+  return (time - start) / (end - start);
+}
+
+function barGeom(
+  activity: ActivityTask,
+  range: { start: Date; end: Date },
+  chartW: number,
+  index: number,
+  labelW: number,
+): BarGeom {
   const startPct = dateToPercent(parseIso(activity.startDate), range.start, range.end);
   const endPct = dateToPercent(parseIso(activity.endDate), range.start, range.end);
-  const x = LABEL_W + (startPct / 100) * chartW;
+  const x = labelW + (startPct / 100) * chartW;
   const w = Math.max(12, ((endPct - startPct) / 100) * chartW);
   return {
     x,
@@ -92,6 +136,7 @@ function finishToStartPath(
   toIndex: number,
   geoms: BarGeom[],
   chartRight: number,
+  labelW: number,
 ): string {
   const x1 = from.right;
   const y1 = from.cy;
@@ -126,11 +171,31 @@ function finishToStartPath(
     rightLane = Math.max(rightLane, geoms[i].right + STUB);
   }
   rightLane = Math.min(rightLane, chartRight - 4);
-  const inX = Math.max(LABEL_W + 6, endX - STUB);
+  const inX = Math.max(labelW + 6, endX - STUB);
   const gutterY = fromIndex < toIndex
     ? HEAD_H + toIndex * ROW_H
     : HEAD_H + toIndex * ROW_H + ROW_H;
   return `M ${x1} ${y1} L ${rightLane} ${y1} L ${rightLane} ${gutterY} L ${inX} ${gutterY} L ${inX} ${y2} L ${endX} ${y2}`;
+}
+
+function CursorCircle({ cx, cy, progress }: { cx: number; cy: number; progress: number }) {
+  const value = Math.max(0, Math.min(1, progress));
+  if (value <= 0.001) {
+    return <circle cx={cx} cy={cy} r="5" fill="#ffffff" stroke="#c5c7d1" strokeWidth="1.6" />;
+  }
+  if (value >= 0.999) {
+    return <circle cx={cx} cy={cy} r="5" fill="#16a34a" />;
+  }
+  const angle = value * Math.PI * 2 - Math.PI / 2;
+  const x = cx + 5 * Math.cos(angle);
+  const y = cy + 5 * Math.sin(angle);
+  const large = value > 0.5 ? 1 : 0;
+  return (
+    <>
+      <circle cx={cx} cy={cy} r="5" fill="#ffffff" stroke="#c5c7d1" strokeWidth="1.6" />
+      <path d={`M ${cx} ${cy} L ${cx} ${cy - 5} A 5 5 0 ${large} 1 ${x} ${y} Z`} fill="#16a34a" />
+    </>
+  );
 }
 
 export default function GanttChart({
@@ -151,17 +216,21 @@ export default function GanttChart({
   onUnlinkActivities,
 }: GanttChartProps) {
   const [zoom, setZoom] = useState(1);
+  const [labelW, setLabelW] = useState(readLabelWidth);
   const [linkSourceId, setLinkSourceId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [preview, setPreview] = useState<{ id: string; startDate: string; endDate: string } | null>(null);
-  const dragRef = useRef<DragState | null>(null);
+  const pointerMode = useRef<PointerMode>(null);
+  const dragRef = useRef<BarDragState | null>(null);
   const draggingRef = useRef(false);
+  const columnOrigin = useRef({ x: 0, width: DEFAULT_LABEL_W });
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const clipPrefix = compact ? 'v' : 'p';
 
   const range = useMemo(() => getProjectDateRange(activities), [activities]);
   const width = Math.round(920 * zoom) + 28;
-  const chartW = width - LABEL_W - 28;
+  const chartW = Math.max(120, width - labelW - 28);
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     const source = q
@@ -175,12 +244,14 @@ export default function GanttChart({
     );
   }, [activities, query, preview]);
   const height = HEAD_H + Math.max(visible.length, 1) * ROW_H + 8;
-  const playX = LABEL_W + (dateToPercent(playheadDate, range.start, range.end) / 100) * chartW;
-  const statusX = LABEL_W + (dateToPercent(parseIso(statusDate), range.start, range.end) / 100) * chartW;
+  const playX = labelW + (dateToPercent(playheadDate, range.start, range.end) / 100) * chartW;
+  const statusX = labelW + (dateToPercent(parseIso(statusDate), range.start, range.end) / 100) * chartW;
   const geoms = useMemo(
-    () => visible.map((activity, index) => barGeom(activity, range, chartW, index)),
-    [visible, range, chartW],
+    () => visible.map((activity, index) => barGeom(activity, range, chartW, index, labelW)),
+    [visible, range, chartW, labelW],
   );
+  const cursorLabel = formatCursor(playheadDate);
+  const badgeW = Math.max(52, cursorLabel.length * 7 + 16);
 
   const months = useMemo(() => {
     const ticks: { label: string; x: number }[] = [];
@@ -188,12 +259,24 @@ export default function GanttChart({
     while (cursor.getTime() <= range.end.getTime()) {
       ticks.push({
         label: cursor.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }),
-        x: LABEL_W + (dateToPercent(cursor, range.start, range.end) / 100) * chartW,
+        x: labelW + (dateToPercent(cursor, range.start, range.end) / 100) * chartW,
       });
       cursor.setMonth(cursor.getMonth() + 1);
     }
     return ticks;
-  }, [range, chartW]);
+  }, [range, chartW, labelW]);
+
+  const clientToSvgX = (clientX: number) => {
+    const svg = svgRef.current;
+    if (!svg) return 0;
+    const rect = svg.getBoundingClientRect();
+    return ((clientX - rect.left) / rect.width) * width;
+  };
+
+  const setPlayheadFromClientX = (clientX: number) => {
+    const x = clientToSvgX(clientX);
+    onPlayheadChange(Math.max(0, Math.min(100, ((x - labelW) / chartW) * 100)));
+  };
 
   const daysFromDelta = (dx: number) => {
     const spanDays = Math.max(1, (range.end.getTime() - range.start.getTime()) / 86_400_000);
@@ -213,36 +296,11 @@ export default function GanttChart({
     return minDuration(drag.startDate, addDays(drag.endDate, days));
   };
 
-  const previewDrag = (clientX: number) => {
-    const drag = dragRef.current;
-    const next = datesFromDrag(clientX);
-    if (!drag || !next) return;
-    setPreview({ id: drag.id, ...next });
-  };
-
-  const commitDrag = (clientX: number) => {
-    const drag = dragRef.current;
-    const nextDates = datesFromDrag(clientX);
-    const activity = drag ? activities.find((item) => item.id === drag.id) : null;
-    dragRef.current = null;
-    setPreview(null);
-    if (!drag || !nextDates || !activity || !onChangeActivity) return;
-    onChangeActivity({ ...activity, ...nextDates });
-  };
-
-  const handleTimelineClick = (event: React.MouseEvent<SVGSVGElement>) => {
-    if (draggingRef.current) return;
-    const svg = event.currentTarget;
-    const rect = svg.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * width;
-    if (x < LABEL_W) return;
-    onPlayheadChange(Math.max(0, Math.min(100, ((x - LABEL_W) / chartW) * 100)));
-  };
-
-  const startDrag = (activity: ActivityTask, kind: DragKind, clientX: number, event: React.PointerEvent) => {
+  const startBarDrag = (activity: ActivityTask, kind: DragKind, clientX: number, event: React.PointerEvent) => {
     if (!onChangeActivity || linkMode) return;
     event.preventDefault();
     event.stopPropagation();
+    pointerMode.current = 'bar';
     dragRef.current = {
       id: activity.id,
       kind,
@@ -252,6 +310,69 @@ export default function GanttChart({
     };
     draggingRef.current = false;
     svgRef.current?.setPointerCapture(event.pointerId);
+  };
+
+  const startPlayheadDrag = (event: React.PointerEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    pointerMode.current = 'playhead';
+    draggingRef.current = false;
+    svgRef.current?.setPointerCapture(event.pointerId);
+    setPlayheadFromClientX(event.clientX);
+  };
+
+  const startColumnDrag = (event: React.PointerEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    pointerMode.current = 'column';
+    draggingRef.current = false;
+    columnOrigin.current = { x: event.clientX, width: labelW };
+    svgRef.current?.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (!pointerMode.current) return;
+    draggingRef.current = true;
+    if (pointerMode.current === 'playhead') {
+      setPlayheadFromClientX(event.clientX);
+      return;
+    }
+    if (pointerMode.current === 'column') {
+      const next = Math.max(
+        MIN_LABEL_W,
+        Math.min(MAX_LABEL_W, columnOrigin.current.width + (event.clientX - columnOrigin.current.x)),
+      );
+      setLabelW(next);
+      return;
+    }
+    const next = datesFromDrag(event.clientX);
+    const drag = dragRef.current;
+    if (drag && next) setPreview({ id: drag.id, ...next });
+  };
+
+  const handlePointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
+    const mode = pointerMode.current;
+    if (mode === 'bar') {
+      const nextDates = datesFromDrag(event.clientX);
+      const drag = dragRef.current;
+      const activity = drag ? activities.find((item) => item.id === drag.id) : null;
+      dragRef.current = null;
+      setPreview(null);
+      if (drag && nextDates && activity && onChangeActivity) {
+        onChangeActivity({ ...activity, ...nextDates });
+      }
+    }
+    if (mode === 'column') {
+      try {
+        localStorage.setItem(LABEL_W_KEY, String(labelW));
+      } catch {
+        /* ignore */
+      }
+    }
+    pointerMode.current = null;
+    window.setTimeout(() => {
+      draggingRef.current = false;
+    }, 0);
   };
 
   const canEditLinks = Boolean(onLinkActivities);
@@ -265,8 +386,8 @@ export default function GanttChart({
           </span>
           {!compact && (
             <span>
-              Glissez une barre pour la déplacer, ses bords pour changer les dates. Les liaisons partent de la fin
-              et arrivent au début.
+              Glissez le curseur bleu pour changer la date. Glissez une barre pour la déplacer, le bord de la
+              colonne Activité pour l’élargir.
             </span>
           )}
           {!compact && onCreateActivity && (
@@ -291,7 +412,7 @@ export default function GanttChart({
           )}
           <span className="inline-flex items-center gap-3">
             <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-6 rounded-sm bg-[#22c55e]" /> Planifié
+              <span className="h-2 w-6 rounded-sm bg-[#16a34a]" /> Planifié
             </span>
             {options.actualProgress && (
               <span className="inline-flex items-center gap-1">
@@ -371,42 +492,52 @@ export default function GanttChart({
           <svg
             ref={svgRef}
             viewBox={`0 0 ${width} ${height}`}
-            className="min-w-[860px] cursor-crosshair"
-            style={{ width: `${width}px`, height: `${height}px` }}
-            onClick={handleTimelineClick}
-            onPointerMove={(event) => {
-              if (!dragRef.current) return;
-              if (Math.abs(event.clientX - dragRef.current.originX) > 3) draggingRef.current = true;
-              previewDrag(event.clientX);
-            }}
-            onPointerUp={(event) => {
-              if (dragRef.current) {
-                commitDrag(event.clientX);
-                window.setTimeout(() => {
-                  draggingRef.current = false;
-                }, 0);
-              }
-            }}
+            className="min-w-[860px]"
+            style={{ width: `${width}px`, height: `${height}px`, touchAction: 'none' }}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
           >
             <defs>
-              <marker id="gantt-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+              <marker id={`gantt-arrow-${clipPrefix}`} markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="userSpaceOnUse">
                 <path d="M0,0 L8,4 L0,8 Z" fill={LINK} />
               </marker>
+              {visible.map((activity, index) => (
+                <clipPath key={activity.id} id={`bar-clip-${clipPrefix}-${activity.id}`}>
+                  <rect x={geoms[index].x} y={HEAD_H + index * ROW_H + BAR_Y} width={geoms[index].w} height={BAR_H} rx="2" />
+                </clipPath>
+              ))}
+              <clipPath id={`label-clip-${clipPrefix}`}>
+                <rect x="24" y={HEAD_H} width={Math.max(40, labelW - 86)} height={height} />
+              </clipPath>
             </defs>
 
             <rect x="0" y="0" width={width} height={height} fill="#ffffff" />
             <rect x="0" y="0" width={width} height={HEAD_H} fill="#fafafc" />
+            <rect
+              x={labelW}
+              y="0"
+              width={chartW + 28}
+              height={HEAD_H}
+              fill="transparent"
+              className="cursor-ew-resize"
+              onPointerDown={startPlayheadDrag}
+            />
 
             {months.map((tick) => (
               <g key={tick.label}>
                 <line x1={tick.x} y1="0" x2={tick.x} y2={height} stroke="#eeeef3" />
-                <text x={tick.x + 6} y={26} fontSize="11" fill="#6a6e79">
+                <text x={tick.x + 6} y={18} fontSize="11" fill="#6a6e79">
                   {tick.label}
                 </text>
               </g>
             ))}
 
-            <line x1={LABEL_W} y1="0" x2={LABEL_W} y2={height} stroke="#e0e1e9" />
+            <text x="24" y="18" fontSize="11" fontWeight="600" fill="#6a6e79">
+              Activité
+            </text>
+
+            <line x1={labelW} y1="0" x2={labelW} y2={height} stroke="#e0e1e9" />
 
             {visible.map((activity, index) => {
               const y = HEAD_H + index * ROW_H;
@@ -414,8 +545,8 @@ export default function GanttChart({
               const selected = selectedActivityId === activity.id;
               const source = linkSourceId === activity.id;
               const late = options.lateElements && isActivityLate(activity, statusDate);
-              const state = getActivityState(activity, statusDate);
-              const done = state === 'Finished' || state === 'Ahead';
+              const progressAtCursor = playheadProgress(activity, playheadDate);
+              const doneW = Math.max(0, Math.min(geom.w, geom.w * progressAtCursor));
               const actualStart = activity.actualStart ? parseIso(activity.actualStart) : null;
               const actualEnd = activity.actualEnd
                 ? parseIso(activity.actualEnd)
@@ -428,10 +559,10 @@ export default function GanttChart({
                     )
                   : null;
               const ax1 = actualStart
-                ? LABEL_W + (dateToPercent(actualStart, range.start, range.end) / 100) * chartW
+                ? labelW + (dateToPercent(actualStart, range.start, range.end) / 100) * chartW
                 : geom.x;
               const ax2 = actualEnd
-                ? LABEL_W + (dateToPercent(actualEnd, range.start, range.end) / 100) * chartW
+                ? labelW + (dateToPercent(actualEnd, range.start, range.end) / 100) * chartW
                 : geom.x;
 
               return (
@@ -461,16 +592,16 @@ export default function GanttChart({
                     height={ROW_H}
                     fill={source ? '#d7e8f5' : selected ? '#e8f3fb' : index % 2 === 0 ? '#ffffff' : '#fcfcfd'}
                   />
-                  <circle cx="14" cy={y + 16} r="4" fill={done ? '#22c55e' : '#c5c7d1'} />
-                  <text x="24" y={y + 20} fontSize="12" fill="#252a2e">
-                    {activity.name.length > 28 ? `${activity.name.slice(0, 28)}…` : activity.name}
+                  <CursorCircle cx={14} cy={y + 16} progress={progressAtCursor} />
+                  <text x="24" y={y + 20} fontSize="12" fill="#252a2e" clipPath={`url(#label-clip-${clipPrefix})`}>
+                    {activity.name}
                   </text>
                   {late && (
-                    <text x={LABEL_W - 78} y={y + 20} fontSize="10" fill="#c2410c" fontWeight="600">
+                    <text x={labelW - 58} y={y + 20} fontSize="10" fill="#c2410c" fontWeight="600">
                       {activity.assignedObjectIds.length} en retard
                     </text>
                   )}
-                  <text x={LABEL_W - 18} y={y + 20} fontSize="11" fill="#6a6e79" textAnchor="end">
+                  <text x={labelW - 10} y={y + 20} fontSize="11" fill="#6a6e79" textAnchor="end">
                     {activity.assignedObjectIds.length}
                   </text>
                   <rect
@@ -479,9 +610,30 @@ export default function GanttChart({
                     width={geom.w}
                     height={BAR_H}
                     rx="2"
-                    fill={late ? '#ef4444' : PLANNED}
-                    onPointerDown={(event) => startDrag(activity, 'move', event.clientX, event)}
+                    fill={late ? LATE_TODO : PLANNED_TODO}
+                    onPointerDown={(event) => startBarDrag(activity, 'move', event.clientX, event)}
                   />
+                  {doneW > 0 && (
+                    <rect
+                      x={geom.x}
+                      y={y + BAR_Y}
+                      width={doneW}
+                      height={BAR_H}
+                      rx="2"
+                      fill={late ? LATE_DONE : PLANNED_DONE}
+                      onPointerDown={(event) => startBarDrag(activity, 'move', event.clientX, event)}
+                    />
+                  )}
+                  <text
+                    x={geom.x + 5}
+                    y={y + BAR_Y + 12}
+                    fontSize="10"
+                    fill="#ffffff"
+                    clipPath={`url(#bar-clip-${clipPrefix}-${activity.id})`}
+                    pointerEvents="none"
+                  >
+                    {truncateToWidth(activity.name, geom.w - 8)}
+                  </text>
                   {onChangeActivity && !linkMode && (
                     <>
                       <rect
@@ -491,7 +643,7 @@ export default function GanttChart({
                         height={BAR_H}
                         fill="transparent"
                         className="cursor-ew-resize"
-                        onPointerDown={(event) => startDrag(activity, 'start', event.clientX, event)}
+                        onPointerDown={(event) => startBarDrag(activity, 'start', event.clientX, event)}
                       />
                       <rect
                         x={geom.right - 6}
@@ -500,7 +652,7 @@ export default function GanttChart({
                         height={BAR_H}
                         fill="transparent"
                         className="cursor-ew-resize"
-                        onPointerDown={(event) => startDrag(activity, 'end', event.clientX, event)}
+                        onPointerDown={(event) => startBarDrag(activity, 'end', event.clientX, event)}
                       />
                     </>
                   )}
@@ -512,6 +664,7 @@ export default function GanttChart({
                       y2={y + BAR_Y + BAR_H - 2}
                       stroke="#111827"
                       strokeWidth="2"
+                      pointerEvents="none"
                     />
                   )}
                 </g>
@@ -530,6 +683,7 @@ export default function GanttChart({
                     toIndex,
                     geoms,
                     width,
+                    labelW,
                   );
                   return (
                     <path
@@ -538,7 +692,7 @@ export default function GanttChart({
                       fill="none"
                       stroke={LINK}
                       strokeWidth="1.6"
-                      markerEnd="url(#gantt-arrow)"
+                      markerEnd={`url(#gantt-arrow-${clipPrefix})`}
                       className={onUnlinkActivities ? 'cursor-pointer' : undefined}
                       onClick={(event) => {
                         event.stopPropagation();
@@ -551,7 +705,6 @@ export default function GanttChart({
                 }),
               )}
 
-            <line x1={playX} y1="0" x2={playX} y2={height} stroke={PLAYHEAD} strokeWidth="2" />
             <line
               x1={statusX}
               y1="0"
@@ -560,6 +713,38 @@ export default function GanttChart({
               stroke={STATUS}
               strokeWidth="1.5"
               strokeDasharray="4 3"
+              pointerEvents="none"
+            />
+
+            <g onPointerDown={startPlayheadDrag} className="cursor-ew-resize">
+              <rect x={playX - 8} y="0" width="16" height={height} fill="transparent" />
+              <line x1={playX} y1="0" x2={playX} y2={height} stroke={PLAYHEAD} strokeWidth="2" />
+              <rect x={playX - badgeW / 2} y="3" width={badgeW} height="18" rx="3" fill={PLAYHEAD} />
+              <text
+                x={playX}
+                y="16"
+                fontSize="10"
+                fontWeight="700"
+                fill="#ffffff"
+                textAnchor="middle"
+                pointerEvents="none"
+              >
+                {cursorLabel}
+              </text>
+              <rect x={playX - 11} y={HEAD_H - 2} width="22" height="12" rx="2" fill={PLAYHEAD} />
+              <text x={playX} y={HEAD_H + 8} fontSize="8" fill="#ffffff" textAnchor="middle" pointerEvents="none">
+                ◂|▸
+              </text>
+            </g>
+
+            <rect
+              x={labelW - 3}
+              y="0"
+              width="6"
+              height={height}
+              fill="transparent"
+              className="cursor-col-resize"
+              onPointerDown={startColumnDrag}
             />
           </svg>
         </div>
