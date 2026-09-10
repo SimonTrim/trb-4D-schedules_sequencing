@@ -29,7 +29,7 @@ const SWITCHES: { key: keyof SequencingOptions; label: string }[] = [
   { key: 'statusColors', label: 'Couleurs de statut' },
   { key: 'hideUnbuilt', label: 'Masquer le non construit' },
   { key: 'dependencyLinks', label: 'Liens de dépendance' },
-  { key: 'actualProgress', label: 'Avancement réel' },
+  { key: 'actualProgress', label: 'Avancement au curseur' },
   { key: 'lateElements', label: 'Éléments en retard' },
   { key: 'autoOrbit', label: 'Orbite caméra auto' },
 ];

@@ -5,7 +5,6 @@ import {
   dateToPercent,
   formatIso,
   formatShort,
-  getActualProgressRange,
   getDelayEnd,
   getProjectDateRange,
   isActivityLate,
@@ -453,7 +452,7 @@ export default function GanttChart({
             </span>
             {options.actualProgress && (
               <span className="inline-flex items-center gap-1">
-                <span className="h-px w-6 bg-black" /> Réel
+                <span className="h-px w-6 bg-black" /> Au curseur
               </span>
             )}
             <span className="inline-flex items-center gap-1">
@@ -682,13 +681,10 @@ export default function GanttChart({
               const doneW = Math.max(0, Math.min(geom.w, geom.w * progressAtCursor));
               const toX = (date: Date) =>
                 labelW + (dateToPercent(date, range.start, range.end) / 100) * chartW;
-              const actualRange = getActualProgressRange(activity);
               const delayEnd = getDelayEnd(activity, statusDate);
               const lineY = y + BAR_Y + BAR_H - 1.5;
               const actualX1 = geom.x;
-              const actualX2 = actualRange
-                ? Math.max(geom.x, Math.min(geom.right, toX(actualRange.end)))
-                : geom.x;
+              const actualX2 = geom.x + geom.w * progressAtCursor;
               const delayX = delayEnd ? Math.max(geom.right, toX(delayEnd)) : geom.right;
 
               return (
@@ -784,7 +780,7 @@ export default function GanttChart({
                       />
                     </>
                   )}
-                  {options.actualProgress && actualRange && actualX2 - actualX1 > 1 && (
+                  {options.actualProgress && progressAtCursor > 0 && actualX2 - actualX1 > 1 && (
                     <line
                       x1={actualX1}
                       y1={lineY}
