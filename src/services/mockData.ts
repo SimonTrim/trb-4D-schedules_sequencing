@@ -392,6 +392,35 @@ export function isActivityLate(activity: ActivityTask, statusDate = STATUS_DATE)
   return parseIso(activity.endDate).getTime() < parseIso(statusDate).getTime();
 }
 
+export function getActualProgressRange(activity: ActivityTask): { start: Date; end: Date } | null {
+  const plannedStart = parseIso(activity.startDate);
+  const plannedEnd = parseIso(activity.endDate);
+  const actualStart = activity.actualStart ? parseIso(activity.actualStart) : plannedStart;
+  if (activity.actualEnd) {
+    return { start: actualStart, end: parseIso(activity.actualEnd) };
+  }
+  if (activity.progressPercent > 0) {
+    const span = Math.max(0, plannedEnd.getTime() - plannedStart.getTime());
+    return {
+      start: actualStart,
+      end: new Date(plannedStart.getTime() + (span * activity.progressPercent) / 100),
+    };
+  }
+  return activity.actualStart ? { start: actualStart, end: actualStart } : null;
+}
+
+export function getDelayEnd(activity: ActivityTask, statusDate = STATUS_DATE): Date | null {
+  const plannedEnd = parseIso(activity.endDate);
+  if (activity.actualEnd) {
+    const actual = parseIso(activity.actualEnd);
+    return actual.getTime() > plannedEnd.getTime() ? actual : null;
+  }
+  if (activity.progressPercent < 100 && parseIso(statusDate).getTime() > plannedEnd.getTime()) {
+    return parseIso(statusDate);
+  }
+  return null;
+}
+
 export function resolveObjectStatus(
   objectId: string,
   records: ProgressRecord[],

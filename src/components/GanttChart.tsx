@@ -5,6 +5,8 @@ import {
   dateToPercent,
   formatIso,
   formatShort,
+  getActualProgressRange,
+  getDelayEnd,
   getProjectDateRange,
   isActivityLate,
   parseIso,
@@ -454,6 +456,9 @@ export default function GanttChart({
               </span>
             )}
             <span className="inline-flex items-center gap-1">
+              <span className="h-px w-6 bg-[#dc2626]" /> Retard
+            </span>
+            <span className="inline-flex items-center gap-1">
               <span className="h-3 w-px border-l border-dashed border-[#ef4444]" /> Date de statut
             </span>
           </span>
@@ -668,23 +673,18 @@ export default function GanttChart({
               const late = options.lateElements && isActivityLate(activity, statusDate);
               const progressAtCursor = playheadProgress(activity, playheadDate);
               const doneW = Math.max(0, Math.min(geom.w, geom.w * progressAtCursor));
-              const actualStart = activity.actualStart ? parseIso(activity.actualStart) : null;
-              const actualEnd = activity.actualEnd
-                ? parseIso(activity.actualEnd)
-                : activity.progressPercent > 0
-                  ? new Date(
-                      parseIso(activity.startDate).getTime()
-                        + ((parseIso(activity.endDate).getTime() - parseIso(activity.startDate).getTime())
-                          * activity.progressPercent)
-                          / 100,
-                    )
-                  : null;
-              const ax1 = actualStart
-                ? labelW + (dateToPercent(actualStart, range.start, range.end) / 100) * chartW
+              const toX = (date: Date) =>
+                labelW + (dateToPercent(date, range.start, range.end) / 100) * chartW;
+              const actualRange = getActualProgressRange(activity);
+              const delayEnd = getDelayEnd(activity, statusDate);
+              const lineY = y + BAR_Y + BAR_H - 2;
+              const actualX1 = actualRange
+                ? Math.max(geom.x, Math.min(geom.right, toX(actualRange.start)))
                 : geom.x;
-              const ax2 = actualEnd
-                ? labelW + (dateToPercent(actualEnd, range.start, range.end) / 100) * chartW
+              const actualX2 = actualRange
+                ? Math.max(geom.x, Math.min(geom.right, toX(actualRange.end)))
                 : geom.x;
+              const delayX = delayEnd ? Math.max(geom.right, toX(delayEnd)) : geom.right;
 
               return (
                 <g
@@ -778,13 +778,24 @@ export default function GanttChart({
                       />
                     </>
                   )}
-                  {options.actualProgress && actualEnd && (
+                  {options.actualProgress && actualRange && actualX2 - actualX1 > 1 && (
                     <line
-                      x1={ax1}
-                      y1={y + BAR_Y + BAR_H - 2}
-                      x2={ax2}
-                      y2={y + BAR_Y + BAR_H - 2}
+                      x1={actualX1}
+                      y1={lineY}
+                      x2={actualX2}
+                      y2={lineY}
                       stroke="#111827"
+                      strokeWidth="2"
+                      pointerEvents="none"
+                    />
+                  )}
+                  {delayEnd && delayX > geom.right + 1 && (
+                    <line
+                      x1={geom.right}
+                      y1={lineY}
+                      x2={delayX}
+                      y2={lineY}
+                      stroke="#dc2626"
                       strokeWidth="2"
                       pointerEvents="none"
                     />
