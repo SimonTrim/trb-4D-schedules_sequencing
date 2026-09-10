@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link2, Maximize2, Minus, Plus, Search } from 'lucide-react';
-import { ActivityTask, ProgressRecord, SequencingOptions } from '../types/schedule';
+import { ActivityTask, LinkRoute, ProgressRecord, SequencingOptions } from '../types/schedule';
 import {
   dateToPercent,
   formatIso,
@@ -9,6 +9,7 @@ import {
   isActivityLate,
   parseIso,
 } from '../services/mockData';
+import { computeLinkGeometry, routeFromGeometry, type BarGeom } from '../services/ganttLinks';
 
 interface GanttChartProps {
   activities: ActivityTask[];
@@ -44,17 +45,13 @@ const LATE_TODO = '#fca5a5';
 const PLAYHEAD = '#217cbb';
 const STATUS = '#ef4444';
 const LINK = '#6a6e79';
-const STUB = 10;
-const ARROW_GAP = 8;
-
 type DragKind = 'move' | 'start' | 'end';
-type PointerMode = 'bar' | 'playhead' | 'column' | null;
+type PointerMode = 'bar' | 'playhead' | 'column' | 'link' | null;
+type LinkHandle = 'out' | 'mid' | 'in';
 
-interface BarGeom {
-  x: number;
-  w: number;
-  right: number;
-  cy: number;
+interface SelectedLink {
+  fromId: string;
+  toId: string;
 }
 
 interface BarDragState {
@@ -129,53 +126,13 @@ function barGeom(
   };
 }
 
-function finishToStartPath(
-  from: BarGeom,
-  to: BarGeom,
-  fromIndex: number,
-  toIndex: number,
-  geoms: BarGeom[],
-  chartRight: number,
-  labelW: number,
-): string {
-  const x1 = from.right;
-  const y1 = from.cy;
-  const x2 = to.x;
-  const y2 = to.cy;
-  const endX = x2 - ARROW_GAP;
-
-  if (fromIndex === toIndex) {
-    return `M ${x1} ${y1} L ${Math.max(x1 + 2, endX)} ${y2}`;
-  }
-
-  const lo = Math.min(fromIndex, toIndex);
-  const hi = Math.max(fromIndex, toIndex);
-  const mid = (x1 + x2) / 2;
-  if (endX >= x1 + STUB * 2) {
-    let midClear = true;
-    for (let i = lo; i <= hi; i += 1) {
-      if (i === fromIndex || i === toIndex) continue;
-      if (mid >= geoms[i].x - 3 && mid <= geoms[i].right + 3) {
-        midClear = false;
-        break;
-      }
-    }
-    if (midClear) {
-      const laneX = Math.min(Math.max(x1 + STUB, mid), endX - STUB);
-      return `M ${x1} ${y1} L ${laneX} ${y1} L ${laneX} ${y2} L ${endX} ${y2}`;
-    }
-  }
-
-  let rightLane = x1 + STUB;
-  for (let i = lo; i <= hi; i += 1) {
-    rightLane = Math.max(rightLane, geoms[i].right + STUB);
-  }
-  rightLane = Math.min(rightLane, chartRight - 4);
-  const inX = Math.max(labelW + 6, endX - STUB);
-  const gutterY = fromIndex < toIndex
-    ? HEAD_H + toIndex * ROW_H
-    : HEAD_H + toIndex * ROW_H + ROW_H;
-  return `M ${x1} ${y1} L ${rightLane} ${y1} L ${rightLane} ${gutterY} L ${inX} ${gutterY} L ${inX} ${y2} L ${endX} ${y2}`;
+interface LinkDragState {
+  fromId: string;
+  toId: string;
+  handle: LinkHandle;
+  outX: number;
+  midY: number;
+  inX: number;
 }
 
 function CursorCircle({ cx, cy, progress }: { cx: number; cy: number; progress: number }) {
@@ -221,8 +178,11 @@ export default function GanttChart({
   const [query, setQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [preview, setPreview] = useState<{ id: string; startDate: string; endDate: string } | null>(null);
+  const [selectedLink, setSelectedLink] = useState<SelectedLink | null>(null);
+  const [linkPreview, setLinkPreview] = useState<LinkRoute | null>(null);
   const pointerMode = useRef<PointerMode>(null);
   const dragRef = useRef<BarDragState | null>(null);
+  const linkDragRef = useRef<LinkDragState | null>(null);
   const draggingRef = useRef(false);
   const columnOrigin = useRef({ x: 0, width: DEFAULT_LABEL_W });
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -266,12 +226,17 @@ export default function GanttChart({
     return ticks;
   }, [range, chartW, labelW]);
 
-  const clientToSvgX = (clientX: number) => {
+  const clientToSvg = (clientX: number, clientY: number) => {
     const svg = svgRef.current;
-    if (!svg) return 0;
+    if (!svg) return { x: 0, y: 0 };
     const rect = svg.getBoundingClientRect();
-    return ((clientX - rect.left) / rect.width) * width;
+    return {
+      x: ((clientX - rect.left) / rect.width) * width,
+      y: ((clientY - rect.top) / rect.height) * height,
+    };
   };
+
+  const clientToSvgX = (clientX: number) => clientToSvg(clientX, 0).x;
 
   const setPlayheadFromClientX = (clientX: number) => {
     const x = clientToSvgX(clientX);
@@ -330,6 +295,45 @@ export default function GanttChart({
     svgRef.current?.setPointerCapture(event.pointerId);
   };
 
+  const startLinkDrag = (
+    event: React.PointerEvent,
+    fromId: string,
+    toId: string,
+    handle: LinkHandle,
+    geom: ReturnType<typeof computeLinkGeometry>,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    pointerMode.current = 'link';
+    draggingRef.current = false;
+    linkDragRef.current = {
+      fromId,
+      toId,
+      handle,
+      outX: geom.outX,
+      midY: geom.midY,
+      inX: geom.inX,
+    };
+    setSelectedLink({ fromId, toId });
+    svgRef.current?.setPointerCapture(event.pointerId);
+  };
+
+  const applyLinkDrag = (clientX: number, clientY: number) => {
+    const drag = linkDragRef.current;
+    if (!drag) return;
+    const point = clientToSvg(clientX, clientY);
+    const fromIndex = visible.findIndex((item) => item.id === drag.fromId);
+    const toIndex = visible.findIndex((item) => item.id === drag.toId);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const next = {
+      outX: drag.handle === 'out' ? point.x : drag.outX,
+      midY: drag.handle === 'mid' ? point.y : drag.midY,
+      inX: drag.handle === 'in' ? point.x : drag.inX,
+    };
+    linkDragRef.current = { ...drag, ...next };
+    setLinkPreview(routeFromGeometry(geoms[fromIndex], geoms[toIndex], fromIndex, toIndex, next.outX, next.midY, next.inX));
+  };
+
   const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
     if (!pointerMode.current) return;
     draggingRef.current = true;
@@ -343,6 +347,10 @@ export default function GanttChart({
         Math.min(MAX_LABEL_W, columnOrigin.current.width + (event.clientX - columnOrigin.current.x)),
       );
       setLabelW(next);
+      return;
+    }
+    if (pointerMode.current === 'link') {
+      applyLinkDrag(event.clientX, event.clientY);
       return;
     }
     const next = datesFromDrag(event.clientX);
@@ -361,6 +369,32 @@ export default function GanttChart({
       if (drag && nextDates && activity && onChangeActivity) {
         onChangeActivity({ ...activity, ...nextDates });
       }
+    }
+    if (mode === 'link') {
+      applyLinkDrag(event.clientX, event.clientY);
+      const drag = linkDragRef.current;
+      const fromIndex = drag ? visible.findIndex((item) => item.id === drag.fromId) : -1;
+      const toIndex = drag ? visible.findIndex((item) => item.id === drag.toId) : -1;
+      const target = drag ? activities.find((item) => item.id === drag.toId) : null;
+      if (drag && fromIndex >= 0 && toIndex >= 0 && target && onChangeActivity) {
+        onChangeActivity({
+          ...target,
+          linkRoutes: {
+            ...(target.linkRoutes ?? {}),
+            [drag.fromId]: routeFromGeometry(
+              geoms[fromIndex],
+              geoms[toIndex],
+              fromIndex,
+              toIndex,
+              drag.outX,
+              drag.midY,
+              drag.inX,
+            ),
+          },
+        });
+      }
+      linkDragRef.current = null;
+      setLinkPreview(null);
     }
     if (mode === 'column') {
       try {
@@ -471,8 +505,95 @@ export default function GanttChart({
       {linkMode && (
         <div className="shrink-0 border-b border-[#d7e8f5] bg-[#e8f3fb] px-3 py-1.5 text-[12px] text-[#0063a3]">
           {linkSourceId
-            ? 'Cliquez sur une ou plusieurs activités cibles. Cliquez une liaison pour la supprimer.'
+            ? 'Cliquez sur une ou plusieurs activités cibles. Cliquez une liaison pour l’éditer.'
             : 'Cliquez sur l’activité source, puis sur les activités à relier (1 vers n).'}
+        </div>
+      )}
+
+      {selectedLink && (
+        <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[#e6e7ee] bg-[#fafafc] px-3 py-1.5 text-[12px]">
+          <span className="font-medium text-[#252a2e]">Éditeur de liaison</span>
+          <label className="flex items-center gap-1">
+            De
+            <select
+              className="rounded border border-[#d0d1db] bg-white px-1.5 py-0.5"
+              value={selectedLink.fromId}
+              onChange={(event) => {
+                const nextFrom = event.target.value;
+                if (!nextFrom || nextFrom === selectedLink.fromId) return;
+                const current = activities.find((item) => item.id === selectedLink.toId);
+                if (!current || !onChangeActivity) return;
+                const routes = { ...(current.linkRoutes ?? {}) };
+                const kept = routes[selectedLink.fromId];
+                delete routes[selectedLink.fromId];
+                if (kept) routes[nextFrom] = kept;
+                onChangeActivity({
+                  ...current,
+                  predecessors: [
+                    ...(current.predecessors ?? []).filter((id) => id !== selectedLink.fromId),
+                    nextFrom,
+                  ],
+                  linkRoutes: routes,
+                });
+                setSelectedLink({ fromId: nextFrom, toId: selectedLink.toId });
+              }}
+            >
+              {activities
+                .filter((item) => item.id !== selectedLink.toId)
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-1">
+            Vers
+            <select
+              className="rounded border border-[#d0d1db] bg-white px-1.5 py-0.5"
+              value={selectedLink.toId}
+              onChange={(event) => {
+                const nextTo = event.target.value;
+                if (!nextTo || nextTo === selectedLink.toId) return;
+                onUnlinkActivities?.(selectedLink.fromId, selectedLink.toId);
+                onLinkActivities?.(selectedLink.fromId, nextTo);
+                setSelectedLink({ fromId: selectedLink.fromId, toId: nextTo });
+              }}
+            >
+              {activities
+                .filter((item) => item.id !== selectedLink.fromId)
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <span className="text-[#6a6e79]">Glissez les poignées pour déplacer le tracé.</span>
+          <button
+            type="button"
+            className="rounded border border-[#d0d1db] bg-white px-2 py-0.5"
+            onClick={() => {
+              const target = activities.find((item) => item.id === selectedLink.toId);
+              if (!target || !onChangeActivity) return;
+              const routes = { ...(target.linkRoutes ?? {}) };
+              delete routes[selectedLink.fromId];
+              onChangeActivity({ ...target, linkRoutes: routes });
+              setLinkPreview(null);
+            }}
+          >
+            Réinitialiser
+          </button>
+          <button
+            type="button"
+            className="rounded border border-[#d0d1db] bg-white px-2 py-0.5 text-[#c2410c]"
+            onClick={() => {
+              onUnlinkActivities?.(selectedLink.fromId, selectedLink.toId);
+              setSelectedLink(null);
+            }}
+          >
+            Supprimer
+          </button>
         </div>
       )}
 
@@ -571,6 +692,7 @@ export default function GanttChart({
                   onClick={(event) => {
                     event.stopPropagation();
                     if (draggingRef.current) return;
+                    setSelectedLink(null);
                     if (linkMode && onLinkActivities) {
                       if (!linkSourceId) {
                         setLinkSourceId(activity.id);
@@ -676,31 +798,97 @@ export default function GanttChart({
                 (activity.predecessors ?? []).map((predId) => {
                   const fromIndex = visible.findIndex((item) => item.id === predId);
                   if (fromIndex < 0) return null;
-                  const path = finishToStartPath(
+                  const selected =
+                    selectedLink?.fromId === predId && selectedLink?.toId === activity.id;
+                  const route =
+                    selected && linkPreview
+                      ? linkPreview
+                      : activity.linkRoutes?.[predId];
+                  const geom = computeLinkGeometry(
                     geoms[fromIndex],
                     geoms[toIndex],
                     fromIndex,
                     toIndex,
-                    geoms,
-                    width,
+                    route,
                     labelW,
+                    width,
                   );
                   return (
-                    <path
-                      key={`${predId}-${activity.id}`}
-                      d={path}
-                      fill="none"
-                      stroke={LINK}
-                      strokeWidth="1.6"
-                      markerEnd={`url(#gantt-arrow-${clipPrefix})`}
-                      className={onUnlinkActivities ? 'cursor-pointer' : undefined}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onUnlinkActivities?.(predId, activity.id);
-                      }}
-                    >
-                      <title>Liaison Fin → Début — cliquer pour supprimer</title>
-                    </path>
+                    <g key={`${predId}-${activity.id}`}>
+                      <path
+                        d={geom.path}
+                        fill="none"
+                        stroke="transparent"
+                        strokeWidth="10"
+                        className="cursor-pointer"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedLink({ fromId: predId, toId: activity.id });
+                        }}
+                      />
+                      <path
+                        d={geom.path}
+                        fill="none"
+                        stroke={selected ? '#0063a3' : LINK}
+                        strokeWidth={selected ? 2.2 : 1.6}
+                        className="pointer-events-none"
+                      />
+                      <circle cx={geom.endX} cy={geom.y2} r="3.2" fill={selected ? '#0063a3' : LINK} />
+                      {selected && (
+                        <>
+                          <line
+                            x1={geom.outX}
+                            y1={geom.y1}
+                            x2={geom.outX}
+                            y2={geom.midY}
+                            stroke="transparent"
+                            strokeWidth="10"
+                            className="cursor-ew-resize"
+                            onPointerDown={(event) => startLinkDrag(event, predId, activity.id, 'out', geom)}
+                          />
+                          <line
+                            x1={geom.outX}
+                            y1={geom.midY}
+                            x2={geom.inX}
+                            y2={geom.midY}
+                            stroke="transparent"
+                            strokeWidth="10"
+                            className="cursor-ns-resize"
+                            onPointerDown={(event) => startLinkDrag(event, predId, activity.id, 'mid', geom)}
+                          />
+                          <line
+                            x1={geom.inX}
+                            y1={geom.midY}
+                            x2={geom.inX}
+                            y2={geom.y2}
+                            stroke="transparent"
+                            strokeWidth="10"
+                            className="cursor-ew-resize"
+                            onPointerDown={(event) => startLinkDrag(event, predId, activity.id, 'in', geom)}
+                          />
+                          <rect
+                            x={geom.outX - 4}
+                            y={geom.midY - 4}
+                            width="8"
+                            height="8"
+                            fill="#ffffff"
+                            stroke="#0063a3"
+                            className="cursor-move"
+                            onPointerDown={(event) => startLinkDrag(event, predId, activity.id, 'out', geom)}
+                          />
+                          <rect
+                            x={geom.inX - 4}
+                            y={geom.midY - 4}
+                            width="8"
+                            height="8"
+                            fill="#ffffff"
+                            stroke="#0063a3"
+                            className="cursor-move"
+                            onPointerDown={(event) => startLinkDrag(event, predId, activity.id, 'in', geom)}
+                          />
+                        </>
+                      )}
+                    </g>
                   );
                 }),
               )}

@@ -39,6 +39,12 @@ export interface ProgressRecord {
   notes?: string;
 }
 
+export interface LinkRoute {
+  stubOut?: number;
+  stubIn?: number;
+  midT?: number;
+}
+
 export interface ActivityTask {
   id: string;
   name: string;
@@ -50,6 +56,7 @@ export interface ActivityTask {
   assignedObjectIds: string[];
   modelId?: string;
   predecessors?: string[];
+  linkRoutes?: Record<string, LinkRoute>;
   type?: 'Construct' | 'Demolish' | 'Temporary';
 }
 

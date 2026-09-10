@@ -1,4 +1,4 @@
-import { ActivityTask } from '../types/schedule';
+import { ActivityTask, LinkRoute } from '../types/schedule';
 
 export function wouldCreateCycle(activities: ActivityTask[], fromId: string, toId: string): boolean {
   if (fromId === toId) return true;
@@ -27,7 +27,28 @@ export function addDependency(activities: ActivityTask[], fromId: string, toId: 
 export function removeDependency(activities: ActivityTask[], fromId: string, toId: string): ActivityTask[] {
   return activities.map((activity) => {
     if (activity.id !== toId) return activity;
-    return { ...activity, predecessors: (activity.predecessors ?? []).filter((id) => id !== fromId) };
+    const linkRoutes = { ...(activity.linkRoutes ?? {}) };
+    delete linkRoutes[fromId];
+    return {
+      ...activity,
+      predecessors: (activity.predecessors ?? []).filter((id) => id !== fromId),
+      linkRoutes,
+    };
+  });
+}
+
+export function setLinkRoute(
+  activities: ActivityTask[],
+  fromId: string,
+  toId: string,
+  route: LinkRoute,
+): ActivityTask[] {
+  return activities.map((activity) => {
+    if (activity.id !== toId) return activity;
+    return {
+      ...activity,
+      linkRoutes: { ...(activity.linkRoutes ?? {}), [fromId]: route },
+    };
   });
 }
 

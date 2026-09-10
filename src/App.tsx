@@ -413,10 +413,15 @@ export default function App() {
     setActivities((prev) =>
       prev
         .filter((item) => item.id !== id)
-        .map((item) => ({
-          ...item,
-          predecessors: (item.predecessors ?? []).filter((predId) => predId !== id),
-        })),
+        .map((item) => {
+          const linkRoutes = { ...(item.linkRoutes ?? {}) };
+          delete linkRoutes[id];
+          return {
+            ...item,
+            predecessors: (item.predecessors ?? []).filter((predId) => predId !== id),
+            linkRoutes,
+          };
+        }),
     );
     if (drawerActivity?.id === id) setDrawerActivity(null);
   };

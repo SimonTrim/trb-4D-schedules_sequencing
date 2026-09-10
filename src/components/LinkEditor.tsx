@@ -39,7 +39,7 @@ export default function LinkEditor({
       <p className="max-w-xl text-[#6a6e79]">
         {linkMode
           ? 'Cliquez d’abord sur l’activité source, puis sur une ou plusieurs cibles. Une source peut alimenter plusieurs activités qui démarrent ensemble.'
-          : 'Sélectionnez une activité pour voir et modifier ses liaisons Fin → Début.'}
+          : 'Sélectionnez une activité ou cliquez une liaison sur le Gantt pour modifier son tracé.'}
       </p>
       {selected && (
         <div className="flex min-w-[280px] flex-1 flex-wrap gap-4">
