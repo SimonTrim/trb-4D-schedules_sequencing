@@ -38,8 +38,9 @@ const MAX_LABEL_W = 560;
 const LABEL_W_KEY = 'tc-4d-gantt-label-w';
 const ROW_H = 32;
 const HEAD_H = 44;
-const BAR_Y = 8;
-const BAR_H = 16;
+const BAR_Y = 7;
+const BAR_H = 18;
+const LINE_LANE = 5;
 const PLANNED_DONE = '#16a34a';
 const PLANNED_TODO = '#86efac';
 const LATE_DONE = '#dc2626';
@@ -630,7 +631,13 @@ export default function GanttChart({
               </marker>
               {visible.map((activity, index) => (
                 <clipPath key={activity.id} id={`bar-clip-${clipPrefix}-${activity.id}`}>
-                  <rect x={geoms[index].x} y={HEAD_H + index * ROW_H + BAR_Y} width={geoms[index].w} height={BAR_H} rx="2" />
+                  <rect
+                    x={geoms[index].x}
+                    y={HEAD_H + index * ROW_H + BAR_Y}
+                    width={geoms[index].w}
+                    height={BAR_H - LINE_LANE}
+                    rx="2"
+                  />
                 </clipPath>
               ))}
               <clipPath id={`label-clip-${clipPrefix}`}>
@@ -677,10 +684,8 @@ export default function GanttChart({
                 labelW + (dateToPercent(date, range.start, range.end) / 100) * chartW;
               const actualRange = getActualProgressRange(activity);
               const delayEnd = getDelayEnd(activity, statusDate);
-              const lineY = y + BAR_Y + BAR_H - 2;
-              const actualX1 = actualRange
-                ? Math.max(geom.x, Math.min(geom.right, toX(actualRange.start)))
-                : geom.x;
+              const lineY = y + BAR_Y + BAR_H - 1.5;
+              const actualX1 = geom.x;
               const actualX2 = actualRange
                 ? Math.max(geom.x, Math.min(geom.right, toX(actualRange.end)))
                 : geom.x;
@@ -748,9 +753,10 @@ export default function GanttChart({
                   )}
                   <text
                     x={geom.x + 5}
-                    y={y + BAR_Y + 12}
+                    y={y + BAR_Y + (BAR_H - LINE_LANE) / 2 + 1}
                     fontSize="10"
                     fill="#ffffff"
+                    dominantBaseline="middle"
                     clipPath={`url(#bar-clip-${clipPrefix}-${activity.id})`}
                     pointerEvents="none"
                   >
@@ -785,7 +791,8 @@ export default function GanttChart({
                       x2={actualX2}
                       y2={lineY}
                       stroke="#111827"
-                      strokeWidth="2"
+                      strokeWidth="1.75"
+                      strokeLinecap="butt"
                       pointerEvents="none"
                     />
                   )}
@@ -796,7 +803,8 @@ export default function GanttChart({
                       x2={delayX}
                       y2={lineY}
                       stroke="#dc2626"
-                      strokeWidth="2"
+                      strokeWidth="1.75"
+                      strokeLinecap="butt"
                       pointerEvents="none"
                     />
                   )}
