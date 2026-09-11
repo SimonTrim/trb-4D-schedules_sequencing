@@ -5,6 +5,12 @@
   ],
   "headers": [
     {
+      "source": "/manifest(.*).json",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, max-age=0" }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },

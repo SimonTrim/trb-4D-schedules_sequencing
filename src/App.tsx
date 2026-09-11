@@ -16,6 +16,7 @@ import {
   parseExtensionCommand,
   PROJECT_MENU_COMMAND,
   registerProjectMenu,
+  registerViewerToolbarIcon,
   resetObjectsColor,
   selectActivityObjects,
   setObjectsColor,
@@ -209,6 +210,9 @@ export default function App() {
       else if (host === 'project') applyMode('project');
       if (workspace && !isViewerHost(host)) {
         await registerProjectMenu(workspace);
+      }
+      if (workspace && isViewerHost(host)) {
+        await registerViewerToolbarIcon(workspace);
       }
       if (workspace && (isViewerHost(host) || inIframe)) {
         const count = await bindLoadedObjects(workspace);

@@ -141,6 +141,8 @@ export function isViewerHost(host: string | null): boolean {
 }
 
 const MENU_ICON = 'https://trb-4d-schedules-sequencing.vercel.app/icon-48.png';
+const VIEWER_TOOLBAR_ICON =
+  'https://trb-4d-schedules-sequencing.vercel.app/icon-toolbar-black-20260911.png';
 
 export const PROJECT_MENU_COMMAND = '4d.open';
 
@@ -162,6 +164,27 @@ export async function registerProjectMenu(workspaceApi: WorkspaceApi | null) {
     });
   } catch (err) {
     console.warn('setMenu a échoué :', err);
+  }
+}
+
+export async function registerViewerToolbarIcon(workspaceApi: WorkspaceApi | null) {
+  const configure = (
+    workspaceApi?.extension as
+      | { configure?: (config: Record<string, unknown>) => Promise<boolean> }
+      | undefined
+  )?.configure;
+  if (!configure) return;
+  try {
+    await configure({
+      title: 'Planning 4D',
+      url: 'https://trb-4d-schedules-sequencing.vercel.app/',
+      icon: VIEWER_TOOLBAR_ICON,
+      description: 'Planning de construction de chaque modèle : Gantt, import / export, avancement et références.',
+      enabled: true,
+      extensionType: ['project', '3dviewer'],
+    });
+  } catch (err) {
+    console.warn('configure icône viewer a échoué :', err);
   }
 }
 
