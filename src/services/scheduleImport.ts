@@ -1,9 +1,12 @@
-import { ActivityTask } from '../types/schedule';
+import { ActivityTask, ProgressRecord, ScheduleBaseline } from '../types/schedule';
 import { formatIso } from './mockData';
 
 export interface ImportResult {
   activities: ActivityTask[];
   format: string;
+  progress?: ProgressRecord[];
+  baselines?: ScheduleBaseline[];
+  activeBaselineId?: string | null;
 }
 
 function toIso(value: string | undefined): string | undefined {
@@ -211,7 +214,21 @@ export async function importScheduleFile(file: File): Promise<ImportResult> {
 
   if (name.endsWith('.json') || text.trimStart().startsWith('{') || text.trimStart().startsWith('[')) {
     const activities = parseNativeJson(text);
-    if (activities?.length) return { activities, format: 'JSON 4D' };
+    if (activities?.length) {
+      try {
+        const parsed = JSON.parse(text);
+        return {
+          activities,
+          format: 'JSON 4D',
+          progress: Array.isArray(parsed.progress) ? parsed.progress : undefined,
+          baselines: Array.isArray(parsed.baselines) ? parsed.baselines : undefined,
+          activeBaselineId:
+            typeof parsed.activeBaselineId === 'string' ? parsed.activeBaselineId : undefined,
+        };
+      } catch {
+        return { activities, format: 'JSON 4D' };
+      }
+    }
   }
 
   throw new Error('Format non reconnu. Utilisez JSON, CSV, MS Project XML, Primavera XML ou XER.');

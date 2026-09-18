@@ -114,6 +114,42 @@ export interface SCurvePoint {
   actual: number;
 }
 
+export interface BaselineActivitySnapshot {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  progressPercent: number;
+}
+
+export interface ScheduleBaseline {
+  id: string;
+  name: string;
+  capturedAt: string;
+  statusDate: string;
+  activities: BaselineActivitySnapshot[];
+}
+
+export interface BaselineVarianceRow {
+  id: string;
+  name: string;
+  baselineStart: string;
+  baselineEnd: string;
+  currentStart: string;
+  currentEnd: string;
+  startDeltaDays: number;
+  endDeltaDays: number;
+  progressDelta: number;
+}
+
+export interface StatusHeatmapCell {
+  status: ProgressStatus;
+  label: string;
+  colorHex: string;
+  count: number;
+  percent: number;
+}
+
 export interface MockIfcObject {
   id: string;
   name: string;

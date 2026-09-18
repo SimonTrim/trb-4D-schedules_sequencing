@@ -38,11 +38,13 @@ import {
   resolveObjectStatus,
 } from './services/mockData';
 import { addDependency, removeDependency } from './services/scheduleLinks';
+import { captureBaseline } from './services/baselines';
 import {
   ActivityTask,
   AppMode,
   DashboardTab,
   ProgressRecord,
+  ScheduleBaseline,
   SequencingOptions,
   STATUS_CONFIGS,
 } from './types/schedule';
@@ -66,16 +68,29 @@ const DEFAULT_OPTIONS: SequencingOptions = {
 
 const STORAGE_KEY = 'tc-4d-schedule-v2';
 
+interface StoredSchedule {
+  activities: ActivityTask[];
+  progress: ProgressRecord[];
+  baselines: ScheduleBaseline[];
+  activeBaselineId: string | null;
+}
+
 function readModeFromUrl(): AppMode {
   return new URLSearchParams(window.location.search).get('mode') === 'viewer' ? 'viewer' : 'project';
 }
 
-function loadStoredActivities(): ActivityTask[] | null {
+function loadStoredSchedule(): StoredSchedule | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed.activities) ? parsed.activities : null;
+    if (!Array.isArray(parsed.activities)) return null;
+    return {
+      activities: parsed.activities,
+      progress: Array.isArray(parsed.progress) ? parsed.progress : [],
+      baselines: Array.isArray(parsed.baselines) ? parsed.baselines : [],
+      activeBaselineId: typeof parsed.activeBaselineId === 'string' ? parsed.activeBaselineId : null,
+    };
   } catch {
     return null;
   }
@@ -86,8 +101,13 @@ export default function App() {
   const [mode, setMode] = useState<AppMode>(readModeFromUrl);
   const [embedded, setEmbedded] = useState(false);
   const [loadedModels, setLoadedModels] = useState<Array<{ id: string; name?: string }>>([]);
-  const [activities, setActivities] = useState<ActivityTask[]>(() => loadStoredActivities() ?? []);
-  const [progress, setProgress] = useState<ProgressRecord[]>([]);
+  const stored = useMemo(() => loadStoredSchedule(), []);
+  const [activities, setActivities] = useState<ActivityTask[]>(() => stored?.activities ?? []);
+  const [progress, setProgress] = useState<ProgressRecord[]>(() => stored?.progress ?? []);
+  const [baselines, setBaselines] = useState<ScheduleBaseline[]>(() => stored?.baselines ?? []);
+  const [activeBaselineId, setActiveBaselineId] = useState<string | null>(
+    () => stored?.activeBaselineId ?? null,
+  );
   const [selectedModelId, setSelectedModelId] = useState<string | null>('project');
   const [modelsExpanded, setModelsExpanded] = useState(true);
   const [activeTab, setActiveTab] = useState<DashboardTab>('gantt');
@@ -179,11 +199,14 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ activities }));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ activities, progress, baselines, activeBaselineId }),
+      );
     } catch {
       /* ignore quota */
     }
-  }, [activities]);
+  }, [activities, progress, baselines, activeBaselineId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -307,7 +330,14 @@ export default function App() {
   }, [api, embedded, activities, filteredActivities, playheadDate, progress, options.hideUnbuilt, options.statusColors]);
 
   const exportJson = () => {
-    const payload = { models, activities, progress, exportedAt: new Date().toISOString() };
+    const payload = {
+      models,
+      activities,
+      progress,
+      baselines,
+      activeBaselineId,
+      exportedAt: new Date().toISOString(),
+    };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -337,7 +367,9 @@ export default function App() {
     try {
       const result = await importScheduleFile(file);
       setActivities(result.activities);
-      setProgress([]);
+      setProgress(result.progress ?? []);
+      setBaselines(result.baselines ?? []);
+      setActiveBaselineId(result.activeBaselineId ?? null);
       setDrawerActivity(result.activities[0] ?? null);
       setActiveTab('gantt');
       showToast(`${result.activities.length} activités importées (${result.format})`);
@@ -367,6 +399,23 @@ export default function App() {
     setProgress(MOCK_PROGRESS);
     setSelectedModelId(MOCK_ACTIVITIES[0]?.modelId ?? 'project');
     showToast('Exemple de planning chargé');
+  };
+
+  const captureBaselineSnapshot = (name: string) => {
+    if (activities.length === 0) {
+      showToast('Ajoutez des activités avant d’enregistrer une référence');
+      return;
+    }
+    const baseline = captureBaseline(activities, statusDate, name);
+    setBaselines((prev) => [baseline, ...prev]);
+    setActiveBaselineId(baseline.id);
+    showToast(`Référence « ${baseline.name} » enregistrée`);
+  };
+
+  const deleteBaseline = (id: string) => {
+    setBaselines((prev) => prev.filter((baseline) => baseline.id !== id));
+    setActiveBaselineId((current) => (current === id ? null : current));
+    showToast('Référence supprimée');
   };
 
   const openIn3d = async (modelId?: string) => {
@@ -479,6 +528,11 @@ export default function App() {
             onChangeActivity={changeActivity}
             onLinkActivities={linkActivities}
             onUnlinkActivities={unlinkActivities}
+            baselines={baselines}
+            activeBaselineId={activeBaselineId}
+            onCaptureBaseline={captureBaselineSnapshot}
+            onSelectBaseline={setActiveBaselineId}
+            onDeleteBaseline={deleteBaseline}
           />
             </div>
             <ActivityDrawer

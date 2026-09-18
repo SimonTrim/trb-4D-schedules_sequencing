@@ -6,6 +6,8 @@ import ScheduleTable from './ScheduleTable';
 import GanttChart from './GanttChart';
 import LinkEditor from './LinkEditor';
 import ProgressAnalytics from './ProgressAnalytics';
+import BaselinesPanel from './BaselinesPanel';
+import { ScheduleBaseline } from '../types/schedule';
 
 interface ProjectDashboardProps {
   models: IFCModelSchedule[];
@@ -38,6 +40,11 @@ interface ProjectDashboardProps {
   onChangeActivity: (next: ActivityTask) => void;
   onLinkActivities: (fromId: string, toId: string) => void;
   onUnlinkActivities: (fromId: string, toId: string) => void;
+  baselines: ScheduleBaseline[];
+  activeBaselineId: string | null;
+  onCaptureBaseline: (name: string) => void;
+  onSelectBaseline: (id: string | null) => void;
+  onDeleteBaseline: (id: string) => void;
 }
 
 export default function ProjectDashboard({
@@ -71,6 +78,11 @@ export default function ProjectDashboard({
   onChangeActivity,
   onLinkActivities,
   onUnlinkActivities,
+  baselines,
+  activeBaselineId,
+  onCaptureBaseline,
+  onSelectBaseline,
+  onDeleteBaseline,
 }: ProjectDashboardProps) {
   const playheadRef = useRef<HTMLElement | null>(null);
   const statusRef = useRef<HTMLElement | null>(null);
@@ -236,10 +248,15 @@ export default function ProjectDashboard({
         )}
 
         {activeTab === 'baselines' && (
-          <div className="h-full overflow-auto text-[13px] text-[#6a6e79]">
-            La comparaison des références est enregistrée avec le planning. Utilisez Avancement pour
-            consulter l’écart par rapport à la date de statut.
-          </div>
+          <BaselinesPanel
+            activities={activities}
+            baselines={baselines}
+            activeBaselineId={activeBaselineId}
+            statusDate={statusDate}
+            onCapture={onCaptureBaseline}
+            onSelect={onSelectBaseline}
+            onDelete={onDeleteBaseline}
+          />
         )}
       </section>
     </div>

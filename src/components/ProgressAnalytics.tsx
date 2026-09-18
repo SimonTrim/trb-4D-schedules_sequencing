@@ -11,13 +11,15 @@ import {
 } from 'recharts';
 import { ACTIVITY_STATE_LABELS, ActivityState, ActivityTask, ProgressRecord } from '../types/schedule';
 import {
-  buildActivityCountCurve,
+  buildSCurveData,
   computeProgressSnapshot,
   daysBetween,
   formatShort,
   getActivityState,
   isActivityLate,
 } from '../services/mockData';
+import { buildStatusHeatmap } from '../services/baselines';
+import StatusHeatmap from './StatusHeatmap';
 
 interface ProgressAnalyticsProps {
   activities: ActivityTask[];
@@ -39,9 +41,11 @@ export default function ProgressAnalytics({
   statusDate,
 }: ProgressAnalyticsProps) {
   const snap = computeProgressSnapshot(activities, progress, statusDate);
-  const curve = buildActivityCountCurve(activities, statusDate).map((p) => ({
-    ...p,
-    label: formatShort(p.date),
+  const heatmap = buildStatusHeatmap(activities, progress, statusDate);
+  const curve = buildSCurveData(activities, statusDate).map((point) => ({
+    ...point,
+    label: formatShort(point.date),
+    actual: Number.isNaN(point.actual) ? null : point.actual,
   }));
 
   const kpis = [
@@ -66,14 +70,22 @@ export default function ProgressAnalytics({
         ))}
       </div>
 
+      <StatusHeatmap cells={heatmap} />
+
       <div className="rounded border border-[#e6e7ee] bg-white p-3">
+        <div className="mb-2">
+          <h4 className="text-[14px] font-semibold text-[#252a2e]">Courbe S d&apos;avancement</h4>
+          <p className="text-[12px] text-[#6a6e79]">
+            Pourcentage cumulé planifié vs réel à la date de statut.
+          </p>
+        </div>
         <div className="h-[280px] w-full">
           <ResponsiveContainer width="100%" height="100%" minWidth={480} minHeight={240}>
             <LineChart data={curve} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
               <CartesianGrid stroke="#eeeef3" />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#6a6e79' }} />
-              <YAxis tick={{ fontSize: 11, fill: '#6a6e79' }} allowDecimals={false} />
-              <Tooltip />
+              <YAxis tick={{ fontSize: 11, fill: '#6a6e79' }} domain={[0, 100]} unit="%" />
+              <Tooltip formatter={(value: number) => `${value}%`} />
               <Legend />
               <ReferenceLine
                 x={formatShort(statusDate)}

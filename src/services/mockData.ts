@@ -459,12 +459,12 @@ export function resolveActivityStatusAtDate(
   return 'NOT_STARTED';
 }
 
-export function buildSCurveData(activities: ActivityTask[]): SCurvePoint[] {
+export function buildSCurveData(activities: ActivityTask[], statusDate = STATUS_DATE): SCurvePoint[] {
   if (activities.length === 0) return [];
   const { start, end } = getProjectDateRange(activities);
   const points: SCurvePoint[] = [];
   const cursor = new Date(start);
-  const statusDate = parseIso(STATUS_DATE);
+  const status = parseIso(statusDate);
   const total = activities.length;
 
   while (cursor.getTime() <= end.getTime()) {
@@ -479,14 +479,14 @@ export function buildSCurveData(activities: ActivityTask[]): SCurvePoint[] {
     const inProgressWeight = activities.reduce((sum, a) => {
       if (a.actualEnd) return sum;
       const aStart = parseIso(a.actualStart ?? a.startDate);
-      if (cursor.getTime() < aStart.getTime() || cursor.getTime() > statusDate.getTime()) return sum;
+      if (cursor.getTime() < aStart.getTime() || cursor.getTime() > status.getTime()) return sum;
       return sum + a.progressPercent / 100;
     }, 0);
 
     points.push({
       date: formatIso(cursor),
       planned: Math.round((planned / total) * 100),
-      actual: cursor.getTime() > statusDate.getTime()
+      actual: cursor.getTime() > status.getTime()
         ? Number.NaN
         : Math.round(((actual + inProgressWeight * 0.35) / total) * 100),
     });
