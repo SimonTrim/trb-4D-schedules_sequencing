@@ -11,6 +11,7 @@ interface BaselinesPanelProps {
   onCapture: (name: string) => void;
   onSelect: (id: string | null) => void;
   onDelete: (id: string) => void;
+  onOpenGantt: () => void;
 }
 
 function deltaLabel(days: number): string {
@@ -26,6 +27,7 @@ export default function BaselinesPanel({
   onCapture,
   onSelect,
   onDelete,
+  onOpenGantt,
 }: BaselinesPanelProps) {
   const [name, setName] = useState('');
   const activeBaseline = baselines.find((baseline) => baseline.id === activeBaselineId) ?? null;
@@ -114,9 +116,12 @@ export default function BaselinesPanel({
                     {formatShort(activeBaseline.statusDate)}
                   </div>
                 </div>
-                <div className="flex gap-2 text-[12px]">
+                <div className="flex flex-wrap items-center gap-2 text-[12px]">
                   <span className="rounded bg-[#fff7ed] px-2 py-1 text-[#c2410c]">{slipped} en retard</span>
                   <span className="rounded bg-[#eff6ff] px-2 py-1 text-[#217cbb]">{ahead} en avance</span>
+                  <modus-button color="secondary" size="small" button-style="outline" onClick={onOpenGantt}>
+                    Voir sur le Gantt
+                  </modus-button>
                 </div>
               </div>
 

@@ -1,4 +1,4 @@
-import { ActivityTask, ProgressRecord, SequencingOptions, STATUS_CONFIGS } from '../types/schedule';
+import { ActivityTask, ProgressRecord, ScheduleBaseline, SequencingOptions, STATUS_CONFIGS } from '../types/schedule';
 import { MockIfcObject } from '../types/schedule';
 import GanttChart from './GanttChart';
 import SequencingPanel from './SequencingPanel';
@@ -42,6 +42,8 @@ interface ViewerShellProps {
   onChangeActivity: (next: ActivityTask) => void;
   onLinkActivities: (fromId: string, toId: string) => void;
   onUnlinkActivities: (fromId: string, toId: string) => void;
+  baseline?: ScheduleBaseline | null;
+  onToggleBaselineOverlay?: () => void;
 }
 
 export default function ViewerShell({
@@ -77,6 +79,8 @@ export default function ViewerShell({
   onChangeActivity,
   onLinkActivities,
   onUnlinkActivities,
+  baseline = null,
+  onToggleBaselineOverlay,
 }: ViewerShellProps) {
   const sidePanel = panel === 'sequencing' ? (
     <SequencingPanel
@@ -91,6 +95,7 @@ export default function ViewerShell({
       options={options}
       fullWidth={embedded}
       linkedCount={embedded ? linkedCount : undefined}
+      hasBaseline={Boolean(baseline)}
       onPlayheadChange={onPlayheadChange}
       onTogglePlay={onTogglePlay}
       onSpeedChange={onSpeedChange}
@@ -132,6 +137,8 @@ export default function ViewerShell({
         onChangeActivity={onChangeActivity}
         onLinkActivities={onLinkActivities}
         onUnlinkActivities={onUnlinkActivities}
+        baseline={baseline}
+        onToggleBaselineOverlay={onToggleBaselineOverlay}
       />
     </div>
   ) : null;

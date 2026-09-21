@@ -64,6 +64,7 @@ const DEFAULT_OPTIONS: SequencingOptions = {
   actualProgress: false,
   lateElements: false,
   autoOrbit: false,
+  showBaselineOverlay: false,
 };
 
 const STORAGE_KEY = 'tc-4d-schedule-v2';
@@ -163,6 +164,11 @@ export default function App() {
       return { ...obj, status, hidden };
     });
   }, [activities, playheadDate, progress, selectedModelId, options.hideUnbuilt]);
+
+  const activeBaseline = useMemo(
+    () => baselines.find((baseline) => baseline.id === activeBaselineId) ?? null,
+    [baselines, activeBaselineId],
+  );
 
   const linkedCount = useMemo(
     () =>
@@ -409,8 +415,19 @@ export default function App() {
     const baseline = captureBaseline(activities, statusDate, name);
     setBaselines((prev) => [baseline, ...prev]);
     setActiveBaselineId(baseline.id);
+    setOptions((prev) => ({ ...prev, showBaselineOverlay: true }));
+    setActiveTab('gantt');
     showToast(`Référence « ${baseline.name} » enregistrée`);
   };
+
+  const toggleBaselineOverlay = useCallback(() => {
+    setOptions((prev) => ({ ...prev, showBaselineOverlay: !prev.showBaselineOverlay }));
+  }, []);
+
+  const selectBaseline = useCallback((id: string | null) => {
+    setActiveBaselineId(id);
+    if (id) setOptions((prev) => ({ ...prev, showBaselineOverlay: true }));
+  }, []);
 
   const deleteBaseline = (id: string) => {
     setBaselines((prev) => prev.filter((baseline) => baseline.id !== id));
@@ -530,9 +547,12 @@ export default function App() {
             onUnlinkActivities={unlinkActivities}
             baselines={baselines}
             activeBaselineId={activeBaselineId}
+            activeBaseline={activeBaseline}
             onCaptureBaseline={captureBaselineSnapshot}
-            onSelectBaseline={setActiveBaselineId}
+            onSelectBaseline={selectBaseline}
             onDeleteBaseline={deleteBaseline}
+            onToggleBaselineOverlay={toggleBaselineOverlay}
+            onOpenGantt={() => setActiveTab('gantt')}
           />
             </div>
             <ActivityDrawer
@@ -600,6 +620,8 @@ export default function App() {
             onChangeActivity={changeActivity}
             onLinkActivities={linkActivities}
             onUnlinkActivities={unlinkActivities}
+            baseline={activeBaseline}
+            onToggleBaselineOverlay={toggleBaselineOverlay}
             onAssignSelection={async (activityId) => {
               const fallback = api
                 ? await getViewerSelectionIds(api)

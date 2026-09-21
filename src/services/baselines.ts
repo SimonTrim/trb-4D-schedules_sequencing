@@ -1,5 +1,6 @@
 import {
   ActivityTask,
+  BaselineActivitySnapshot,
   BaselineVarianceRow,
   ProgressRecord,
   ProgressStatus,
@@ -7,7 +8,50 @@ import {
   StatusHeatmapCell,
   STATUS_CONFIGS,
 } from '../types/schedule';
-import { daysBetween, parseIso, resolveActivityStatusAtDate, resolveObjectStatus } from './mockData';
+import {
+  dateToPercent,
+  daysBetween,
+  getProjectDateRange,
+  parseIso,
+  resolveActivityStatusAtDate,
+  resolveObjectStatus,
+} from './mockData';
+
+export const BASELINE_FILL = 'rgba(100, 116, 139, 0.18)';
+export const BASELINE_STROKE = '#64748b';
+
+export function getChartRange(
+  activities: ActivityTask[],
+  baseline?: ScheduleBaseline | null,
+): { start: Date; end: Date } {
+  if (!baseline?.activities.length) return getProjectDateRange(activities);
+  const dates = [
+    ...activities.flatMap((activity) => [activity.startDate, activity.endDate]),
+    ...baseline.activities.flatMap((snapshot) => [snapshot.startDate, snapshot.endDate]),
+  ];
+  if (dates.length === 0) return getProjectDateRange(activities);
+  const times = dates.map((iso) => parseIso(iso).getTime());
+  return { start: new Date(Math.min(...times)), end: new Date(Math.max(...times)) };
+}
+
+export function baselineSnapshotMap(baseline?: ScheduleBaseline | null): Map<string, BaselineActivitySnapshot> {
+  const map = new Map<string, BaselineActivitySnapshot>();
+  baseline?.activities.forEach((snapshot) => map.set(snapshot.id, snapshot));
+  return map;
+}
+
+export function baselineBarGeom(
+  snapshot: BaselineActivitySnapshot,
+  range: { start: Date; end: Date },
+  chartW: number,
+  labelW: number,
+): { x: number; w: number; right: number } {
+  const startPct = dateToPercent(parseIso(snapshot.startDate), range.start, range.end);
+  const endPct = dateToPercent(parseIso(snapshot.endDate), range.start, range.end);
+  const x = labelW + (startPct / 100) * chartW;
+  const w = Math.max(8, ((endPct - startPct) / 100) * chartW);
+  return { x, w, right: x + w };
+}
 
 export function captureBaseline(
   activities: ActivityTask[],

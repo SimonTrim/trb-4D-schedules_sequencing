@@ -22,6 +22,7 @@ interface SequencingPanelProps {
   onClose?: () => void;
   fullWidth?: boolean;
   linkedCount?: number;
+  hasBaseline?: boolean;
 }
 
 const SWITCHES: { key: keyof SequencingOptions; label: string }[] = [
@@ -32,6 +33,7 @@ const SWITCHES: { key: keyof SequencingOptions; label: string }[] = [
   { key: 'actualProgress', label: 'Avancement au curseur' },
   { key: 'lateElements', label: 'Éléments en retard' },
   { key: 'autoOrbit', label: 'Orbite caméra auto' },
+  { key: 'showBaselineOverlay', label: 'Référence sur le Gantt' },
 ];
 
 export default function SequencingPanel({
@@ -53,6 +55,7 @@ export default function SequencingPanel({
   onClose,
   fullWidth = false,
   linkedCount,
+  hasBaseline = false,
 }: SequencingPanelProps) {
   const sliderRef = useRef<HTMLElement | null>(null);
   const switchRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -156,7 +159,7 @@ export default function SequencingPanel({
         </div>
 
         <div className="flex flex-col gap-2 border-t border-[#e6e7ee] pt-3">
-          {SWITCHES.map(({ key, label }) => (
+          {SWITCHES.filter(({ key }) => hasBaseline || key !== 'showBaselineOverlay').map(({ key, label }) => (
             <modus-switch
               key={key}
               ref={(node: HTMLElement | null) => {

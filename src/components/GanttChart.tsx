@@ -1,12 +1,18 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link2, Maximize2, Minus, Plus, Search } from 'lucide-react';
-import { ActivityTask, LinkRoute, ProgressRecord, SequencingOptions } from '../types/schedule';
+import { ActivityTask, LinkRoute, ProgressRecord, ScheduleBaseline, SequencingOptions } from '../types/schedule';
+import {
+  BASELINE_FILL,
+  BASELINE_STROKE,
+  baselineBarGeom,
+  baselineSnapshotMap,
+  getChartRange,
+} from '../services/baselines';
 import {
   dateToPercent,
   formatIso,
   formatShort,
   getDelayEnd,
-  getProjectDateRange,
   isActivityLate,
   parseIso,
 } from '../services/mockData';
@@ -29,6 +35,8 @@ interface GanttChartProps {
   onChangeActivity?: (next: ActivityTask) => void;
   onLinkActivities?: (fromId: string, toId: string) => void;
   onUnlinkActivities?: (fromId: string, toId: string) => void;
+  baseline?: ScheduleBaseline | null;
+  onToggleBaselineOverlay?: () => void;
 }
 
 const DEFAULT_LABEL_W = 280;
@@ -173,6 +181,8 @@ export default function GanttChart({
   onChangeActivity,
   onLinkActivities,
   onUnlinkActivities,
+  baseline = null,
+  onToggleBaselineOverlay,
 }: GanttChartProps) {
   const [zoom, setZoom] = useState(1);
   const [labelW, setLabelW] = useState(readLabelWidth);
@@ -190,7 +200,12 @@ export default function GanttChart({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const clipPrefix = compact ? 'v' : 'p';
 
-  const range = useMemo(() => getProjectDateRange(activities), [activities]);
+  const showBaseline = Boolean(baseline && options.showBaselineOverlay);
+  const baselineById = useMemo(() => baselineSnapshotMap(baseline), [baseline]);
+  const range = useMemo(
+    () => getChartRange(activities, showBaseline ? baseline : null),
+    [activities, baseline, showBaseline],
+  );
   const width = Math.round(920 * zoom) + 28;
   const chartW = Math.max(120, width - labelW - 28);
   const visible = useMemo(() => {
@@ -461,7 +476,30 @@ export default function GanttChart({
             <span className="inline-flex items-center gap-1">
               <span className="h-3 w-px border-l border-dashed border-[#ef4444]" /> Date de statut
             </span>
+            {baseline && (
+              <span className="inline-flex items-center gap-1">
+                <span
+                  className="h-2.5 w-6 rounded-sm border border-dashed"
+                  style={{ borderColor: BASELINE_STROKE, backgroundColor: BASELINE_FILL }}
+                />
+                Référence
+              </span>
+            )}
           </span>
+          {baseline && onToggleBaselineOverlay && (
+            <button
+              type="button"
+              className={`rounded px-2 py-1 font-medium ${
+                options.showBaselineOverlay
+                  ? 'bg-[#475569] text-white'
+                  : 'border border-[#d0d1db] bg-white text-[#252a2e]'
+              }`}
+              onClick={onToggleBaselineOverlay}
+              title={baseline.name}
+            >
+              {options.showBaselineOverlay ? 'Masquer référence' : 'Afficher référence'}
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-1 text-[#6a6e79]">
           {showSearch && (
@@ -686,6 +724,10 @@ export default function GanttChart({
               const actualX1 = geom.x;
               const actualX2 = geom.x + geom.w * progressAtCursor;
               const delayX = delayEnd ? Math.max(geom.right, toX(delayEnd)) : geom.right;
+              const baselineSnapshot = showBaseline ? baselineById.get(activity.id) : undefined;
+              const baselineGeom = baselineSnapshot
+                ? baselineBarGeom(baselineSnapshot, range, chartW, labelW)
+                : null;
 
               return (
                 <g
@@ -727,6 +769,50 @@ export default function GanttChart({
                   <text x={labelW - 10} y={y + 20} fontSize="11" fill="#6a6e79" textAnchor="end">
                     {activity.assignedObjectIds.length}
                   </text>
+                  {baselineGeom && (
+                    <>
+                      <rect
+                        x={baselineGeom.x}
+                        y={y + BAR_Y - 3}
+                        width={baselineGeom.w}
+                        height={BAR_H + 6}
+                        rx="2"
+                        fill={BASELINE_FILL}
+                        stroke={BASELINE_STROKE}
+                        strokeWidth="1.25"
+                        strokeDasharray="5 3"
+                        pointerEvents="none"
+                      />
+                      {(baselineGeom.right !== geom.right || baselineGeom.x !== geom.x) && (
+                        <>
+                          {baselineGeom.right < geom.x - 2 && (
+                            <line
+                              x1={baselineGeom.right}
+                              y1={y + BAR_Y + BAR_H / 2}
+                              x2={geom.x}
+                              y2={y + BAR_Y + BAR_H / 2}
+                              stroke={BASELINE_STROKE}
+                              strokeWidth="1"
+                              strokeDasharray="3 2"
+                              pointerEvents="none"
+                            />
+                          )}
+                          {geom.right < baselineGeom.x - 2 && (
+                            <line
+                              x1={geom.right}
+                              y1={y + BAR_Y + BAR_H / 2}
+                              x2={baselineGeom.x}
+                              y2={y + BAR_Y + BAR_H / 2}
+                              stroke={BASELINE_STROKE}
+                              strokeWidth="1"
+                              strokeDasharray="3 2"
+                              pointerEvents="none"
+                            />
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
                   <rect
                     x={geom.x}
                     y={y + BAR_Y}

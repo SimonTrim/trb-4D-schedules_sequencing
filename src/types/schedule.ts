@@ -83,6 +83,7 @@ export interface SequencingOptions {
   actualProgress: boolean;
   lateElements: boolean;
   autoOrbit: boolean;
+  showBaselineOverlay: boolean;
 }
 
 export type ActivityState = 'Finished' | 'In progress' | 'Behind' | 'Ahead' | 'Not due';

@@ -45,6 +45,9 @@ interface ProjectDashboardProps {
   onCaptureBaseline: (name: string) => void;
   onSelectBaseline: (id: string | null) => void;
   onDeleteBaseline: (id: string) => void;
+  activeBaseline: ScheduleBaseline | null;
+  onToggleBaselineOverlay: () => void;
+  onOpenGantt: () => void;
 }
 
 export default function ProjectDashboard({
@@ -83,6 +86,9 @@ export default function ProjectDashboard({
   onCaptureBaseline,
   onSelectBaseline,
   onDeleteBaseline,
+  activeBaseline,
+  onToggleBaselineOverlay,
+  onOpenGantt,
 }: ProjectDashboardProps) {
   const playheadRef = useRef<HTMLElement | null>(null);
   const statusRef = useRef<HTMLElement | null>(null);
@@ -190,6 +196,8 @@ export default function ProjectDashboard({
                 onChangeActivity={onChangeActivity}
                 onLinkActivities={onLinkActivities}
                 onUnlinkActivities={onUnlinkActivities}
+                baseline={activeBaseline}
+                onToggleBaselineOverlay={onToggleBaselineOverlay}
                 emptyHint="Aucune activité. Créez le planning depuis zéro ou importez un fichier 4D."
               />
             </div>
@@ -256,6 +264,7 @@ export default function ProjectDashboard({
             onCapture={onCaptureBaseline}
             onSelect={onSelectBaseline}
             onDelete={onDeleteBaseline}
+            onOpenGantt={onOpenGantt}
           />
         )}
       </section>
