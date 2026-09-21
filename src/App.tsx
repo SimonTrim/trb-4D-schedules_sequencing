@@ -20,9 +20,15 @@ import {
   resetObjectsColor,
   selectActivityObjects,
   setObjectsColor,
+  selectionFromEvent,
   showAllObjects,
   type WorkspaceApi,
 } from './services/trimbleApi';
+import {
+  applyObjectStatus,
+  assignObjectsToActivity,
+  syncActivitiesProgress,
+} from './services/objectAssignment';
 import {
   MOCK_ACTIVITIES,
   MOCK_OBJECTS,
@@ -44,6 +50,7 @@ import {
   AppMode,
   DashboardTab,
   ProgressRecord,
+  ProgressStatus,
   ScheduleBaseline,
   SequencingOptions,
   STATUS_CONFIGS,
@@ -121,6 +128,7 @@ export default function App() {
   const [linkMode, setLinkMode] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [modelEpoch, setModelEpoch] = useState(0);
+  const [viewerSelectionIds, setViewerSelectionIds] = useState<string[]>([]);
   const tabsRef = useRef<HTMLElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -184,6 +192,55 @@ export default function App() {
     window.setTimeout(() => setToast(null), 2800);
   }, []);
 
+  const resolveSelectionIds = useCallback(async (): Promise<string[]> => {
+    if (api) {
+      const live = (await getViewerSelectionIds(api)).filter(isViewerObjectRef);
+      if (live.length > 0) {
+        setViewerSelectionIds(live);
+        return live;
+      }
+    }
+    const cached = viewerSelectionIds.filter(isViewerObjectRef);
+    if (cached.length > 0) return cached;
+    if (!embedded && !api) {
+      return visibleObjects.filter((object) => !object.hidden).slice(0, 2).map((object) => object.id);
+    }
+    return [];
+  }, [api, viewerSelectionIds, embedded, visibleObjects]);
+
+  const assignSelectionToActivity = useCallback(
+    async (activityId: string, mode: 'add' | 'replace') => {
+      const refs = await resolveSelectionIds();
+      if (refs.length === 0) {
+        showToast('Aucune sélection dans le viewer 3D');
+        return;
+      }
+      setActivities((prev) => assignObjectsToActivity(prev, activityId, refs, mode));
+      showToast(`${refs.length} objet(s) lié(s) à l'activité`);
+    },
+    [resolveSelectionIds, showToast],
+  );
+
+  const applyStatusToSelection = useCallback(
+    async (status: ProgressStatus, activityId?: string | null) => {
+      const refs = await resolveSelectionIds();
+      if (refs.length === 0) {
+        showToast('Sélectionnez des objets dans le viewer 3D');
+        return;
+      }
+      const targetId = activityId ?? drawerActivity?.id ?? null;
+      const nextProgress = applyObjectStatus(progress, refs, status);
+      setProgress(nextProgress);
+      setActivities((prev) => {
+        let next = targetId ? assignObjectsToActivity(prev, targetId, refs, 'add') : prev;
+        next = syncActivitiesProgress(next, nextProgress, refs);
+        return next;
+      });
+      showToast(`${refs.length} objet(s) → ${STATUS_CONFIGS[status].labelFr}`);
+    },
+    [resolveSelectionIds, progress, drawerActivity, showToast],
+  );
+
   const applyMode = useCallback((next: AppMode) => {
     setMode(next);
     const url = new URL(window.location.href);
@@ -224,6 +281,9 @@ export default function App() {
       if (event === 'viewer.modelLoaded') {
         setModelEpoch((value) => value + 1);
       }
+      if (event === 'viewer.selectionChanged') {
+        setViewerSelectionIds(selectionFromEvent(data));
+      }
       if (event === 'extension.command') {
         const command = parseExtensionCommand(data);
         if (command === PROJECT_MENU_COMMAND) applyMode('project');
@@ -245,6 +305,8 @@ export default function App() {
       }
       if (workspace && (isViewerHost(host) || inIframe)) {
         const count = await bindLoadedObjects(workspace);
+        const selection = await getViewerSelectionIds(workspace);
+        setViewerSelectionIds(selection);
         if (count > 0) showToast(`${count} modèle(s) chargé(s) — assignez une sélection à une activité`);
       }
     });
@@ -569,19 +631,8 @@ export default function App() {
               }}
               onLink={linkActivities}
               onUnlink={unlinkActivities}
-              onAssignSelection={async (activityId) => {
-                const fallback = api
-                  ? await getViewerSelectionIds(api)
-                  : visibleObjects.filter((o) => !o.hidden).slice(0, 2).map((o) => o.id);
-                setActivities((prev) =>
-                  prev.map((item) => (item.id === activityId ? { ...item, assignedObjectIds: fallback } : item)),
-                );
-                showToast(
-                  fallback.length
-                    ? `${fallback.length} objets assignés`
-                    : 'Aucune sélection. Ouvrez le viewer 3D, sélectionnez des objets, puis réessayez.',
-                );
-              }}
+              onAssignSelection={assignSelectionToActivity}
+              selectionCount={viewerSelectionIds.length}
             />
           </div>
         ) : (
@@ -622,14 +673,16 @@ export default function App() {
             onUnlinkActivities={unlinkActivities}
             baseline={activeBaseline}
             onToggleBaselineOverlay={toggleBaselineOverlay}
-            onAssignSelection={async (activityId) => {
-              const fallback = api
-                ? await getViewerSelectionIds(api)
-                : visibleObjects.filter((o) => !o.hidden).slice(0, 2).map((o) => o.id);
-              setActivities((prev) =>
-                prev.map((a) => (a.id === activityId ? { ...a, assignedObjectIds: fallback } : a)),
-              );
-              showToast(fallback.length ? `${fallback.length} objets assignés` : 'Aucune sélection dans le viewer');
+            onAssignSelection={assignSelectionToActivity}
+            selectionCount={viewerSelectionIds.length}
+            onApplyObjectStatus={(status) => applyStatusToSelection(status, drawerActivity?.id)}
+            onAssignSelectionFromPanel={(mode) => {
+              if (!drawerActivity) {
+                showToast('Choisissez une activité cible dans le panneau Activités');
+                setViewerPanel('activities');
+                return;
+              }
+              assignSelectionToActivity(drawerActivity.id, mode);
             }}
           />
         )}

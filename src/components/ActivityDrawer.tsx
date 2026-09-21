@@ -12,7 +12,8 @@ interface ActivityDrawerProps {
   onEdit: (activity: ActivityTask) => void;
   onDelete: (id: string) => void;
   onSave: (next: ActivityTask) => void;
-  onAssignSelection: (activityId: string) => void;
+  onAssignSelection: (activityId: string, mode: 'add' | 'replace') => void;
+  selectionCount?: number;
   onLink?: (fromId: string, toId: string) => void;
   onUnlink?: (fromId: string, toId: string) => void;
 }
@@ -27,6 +28,7 @@ export default function ActivityDrawer({
   onDelete,
   onSave,
   onAssignSelection,
+  selectionCount = 0,
   onLink,
   onUnlink,
 }: ActivityDrawerProps) {
@@ -227,15 +229,31 @@ export default function ActivityDrawer({
             <div className="text-[11px] text-[#6a6e79]">
               {item.startDate} → {item.endDate}
             </div>
-            <div className="mt-2 flex items-center justify-between text-[12px]">
-              <span className="text-[#6a6e79]">{item.assignedObjectIds.length} objets</span>
-              <button
-                type="button"
-                className="font-medium text-[#0063a3] hover:underline"
-                onClick={() => onAssignSelection(item.id)}
-              >
-                Assigner la sélection
-              </button>
+            <div className="mt-2 space-y-1.5 text-[12px]">
+              <div className="flex items-center justify-between">
+                <span className="text-[#6a6e79]">{item.assignedObjectIds.length} objets liés</span>
+                {selectionCount > 0 && (
+                  <span className="text-[#0063a3]">{selectionCount} sélectionné{selectionCount > 1 ? 's' : ''}</span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="font-medium text-[#0063a3] hover:underline disabled:text-[#9ca3af]"
+                  disabled={selectionCount === 0}
+                  onClick={() => onAssignSelection(item.id, 'add')}
+                >
+                  Ajouter la sélection
+                </button>
+                <button
+                  type="button"
+                  className="font-medium text-[#6a6e79] hover:underline disabled:text-[#9ca3af]"
+                  disabled={selectionCount === 0}
+                  onClick={() => onAssignSelection(item.id, 'replace')}
+                >
+                  Remplacer
+                </button>
+              </div>
             </div>
           </li>
         ))}

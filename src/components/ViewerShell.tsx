@@ -1,4 +1,11 @@
-import { ActivityTask, ProgressRecord, ScheduleBaseline, SequencingOptions, STATUS_CONFIGS } from '../types/schedule';
+import {
+  ActivityTask,
+  ProgressRecord,
+  ProgressStatus,
+  ScheduleBaseline,
+  SequencingOptions,
+  STATUS_CONFIGS,
+} from '../types/schedule';
 import { MockIfcObject } from '../types/schedule';
 import GanttChart from './GanttChart';
 import SequencingPanel from './SequencingPanel';
@@ -36,7 +43,10 @@ interface ViewerShellProps {
   onCreateActivity: () => void;
   onDeleteActivity: (id: string) => void;
   onSaveActivity: (next: ActivityTask) => void;
-  onAssignSelection: (activityId: string) => void;
+  onAssignSelection: (activityId: string, mode: 'add' | 'replace') => void;
+  selectionCount: number;
+  onApplyObjectStatus: (status: ProgressStatus) => void;
+  onAssignSelectionFromPanel: (mode: 'add' | 'replace') => void;
   linkMode: boolean;
   onToggleLinkMode: () => void;
   onChangeActivity: (next: ActivityTask) => void;
@@ -74,6 +84,9 @@ export default function ViewerShell({
   onDeleteActivity,
   onSaveActivity,
   onAssignSelection,
+  selectionCount,
+  onApplyObjectStatus,
+  onAssignSelectionFromPanel,
   linkMode,
   onToggleLinkMode,
   onChangeActivity,
@@ -96,6 +109,10 @@ export default function ViewerShell({
       fullWidth={embedded}
       linkedCount={embedded ? linkedCount : undefined}
       hasBaseline={Boolean(baseline)}
+      selectionCount={selectionCount}
+      targetActivity={selectedActivity}
+      onApplyObjectStatus={onApplyObjectStatus}
+      onAssignSelection={onAssignSelectionFromPanel}
       onPlayheadChange={onPlayheadChange}
       onTogglePlay={onTogglePlay}
       onSpeedChange={onSpeedChange}
@@ -114,6 +131,7 @@ export default function ViewerShell({
       onDelete={onDeleteActivity}
       onSave={onSaveActivity}
       onAssignSelection={onAssignSelection}
+      selectionCount={selectionCount}
       onLink={onLinkActivities}
       onUnlink={onUnlinkActivities}
     />

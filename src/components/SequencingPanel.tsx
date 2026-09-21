@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { Play, Pause, X, ChevronRight } from 'lucide-react';
-import { SequencingOptions } from '../types/schedule';
+import { ActivityTask, ProgressStatus, SequencingOptions } from '../types/schedule';
 import { formatShort } from '../services/mockData';
+import SelectionStatusPanel from './SelectionStatusPanel';
 
 interface SequencingPanelProps {
   playheadPercent: number;
@@ -23,6 +24,10 @@ interface SequencingPanelProps {
   fullWidth?: boolean;
   linkedCount?: number;
   hasBaseline?: boolean;
+  selectionCount?: number;
+  targetActivity?: ActivityTask | null;
+  onApplyObjectStatus?: (status: ProgressStatus) => void;
+  onAssignSelection?: (mode: 'add' | 'replace') => void;
 }
 
 const SWITCHES: { key: keyof SequencingOptions; label: string }[] = [
@@ -56,6 +61,10 @@ export default function SequencingPanel({
   fullWidth = false,
   linkedCount,
   hasBaseline = false,
+  selectionCount = 0,
+  targetActivity = null,
+  onApplyObjectStatus,
+  onAssignSelection,
 }: SequencingPanelProps) {
   const sliderRef = useRef<HTMLElement | null>(null);
   const switchRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -157,6 +166,16 @@ export default function SequencingPanel({
             <span>{formatShort(rangeEnd)}</span>
           </div>
         </div>
+
+        {onApplyObjectStatus && onAssignSelection && (
+          <SelectionStatusPanel
+            selectionCount={selectionCount}
+            targetActivity={targetActivity}
+            onApplyStatus={onApplyObjectStatus}
+            onAssignSelection={onAssignSelection}
+            onOpenActivities={onOpenActivities}
+          />
+        )}
 
         <div className="flex flex-col gap-2 border-t border-[#e6e7ee] pt-3">
           {SWITCHES.filter(({ key }) => hasBaseline || key !== 'showBaselineOverlay').map(({ key, label }) => (
